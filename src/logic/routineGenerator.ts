@@ -32,7 +32,7 @@ export function generateRoutine(
 
   for (const group of MUSCLE_GROUPS) {
     const candidates = EXERCISES.filter(
-      (e) => e.muscleGroups.includes(group) && !usedIds.has(e.id)
+      (e) => e.muscleGroups.includes(group) && !usedIds.has(e.id) && !e.manualOnly
     );
     if (candidates.length === 0) continue;
 

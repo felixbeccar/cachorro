@@ -30,18 +30,22 @@ export const EXERCISES: Exercise[] = [
   { id: 'leg-curl', name: 'Seated Leg Curl', muscleGroups: ['legs'], equipment: 'Machine', defaultSets: 3, defaultReps: '10-12' },
   { id: 'leg-extension', name: 'Leg Extension', muscleGroups: ['legs'], equipment: 'Machine', defaultSets: 3, defaultReps: '12-15' },
   { id: 'calf-raise', name: 'Standing Calf Raise', muscleGroups: ['legs'], equipment: 'Machine / Dumbbell', defaultSets: 3, defaultReps: '12-20' },
+  { id: 'seated-calf-raise', name: 'Seated Calf Raise', muscleGroups: ['legs'], equipment: 'Machine', defaultSets: 3, defaultReps: '12-20' },
 
   // Glutes
   { id: 'hip-thrust', name: 'Barbell Hip Thrust', muscleGroups: ['glutes', 'legs'], equipment: 'Barbell', defaultSets: 3, defaultReps: '8-12' },
   { id: 'cable-kickback', name: 'Cable Glute Kickback', muscleGroups: ['glutes'], equipment: 'Cable', defaultSets: 3, defaultReps: '12-15 / leg' },
   { id: 'bulgarian-split-squat', name: 'Bulgarian Split Squat', muscleGroups: ['glutes', 'legs'], equipment: 'Dumbbell', defaultSets: 3, defaultReps: '8-12 / leg' },
   { id: 'glute-bridge', name: 'Glute Bridge', muscleGroups: ['glutes', 'core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '15-20' },
+  { id: 'single-leg-glute-bridge', name: 'Single-Leg Glute Bridge', muscleGroups: ['glutes', 'core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '10-15 / leg' },
 
   // Core
   { id: 'plank', name: 'Plank', muscleGroups: ['core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '30-60 sec' },
+  { id: 'high-plank-arm-reach', name: 'High Plank with Arm Reach', muscleGroups: ['core', 'shoulders'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '8-12 / side' },
   { id: 'hanging-leg-raise', name: 'Hanging Leg Raise', muscleGroups: ['core'], equipment: 'Pull-up bar', defaultSets: 3, defaultReps: '8-15' },
   { id: 'cable-crunch', name: 'Cable Crunch', muscleGroups: ['core'], equipment: 'Cable', defaultSets: 3, defaultReps: '12-15' },
   { id: 'russian-twist', name: 'Russian Twist', muscleGroups: ['core'], equipment: 'Dumbbell / Plate', defaultSets: 3, defaultReps: '15-20' },
+  { id: 'seated-windshield-wipers', name: 'Seated Windshield Wipers', muscleGroups: ['core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '10-15 / side' },
   { id: 'ab-wheel-rollout', name: 'Ab Wheel Rollout', muscleGroups: ['core'], equipment: 'Ab wheel', defaultSets: 3, defaultReps: '8-12' },
 
   // Arms
@@ -50,6 +54,9 @@ export const EXERCISES: Exercise[] = [
   { id: 'tricep-pushdown', name: 'Cable Tricep Pushdown', muscleGroups: ['arms'], equipment: 'Cable', defaultSets: 3, defaultReps: '10-15' },
   { id: 'overhead-tricep-extension', name: 'Overhead Tricep Extension', muscleGroups: ['arms'], equipment: 'Dumbbell', defaultSets: 3, defaultReps: '10-12' },
   { id: 'close-grip-bench', name: 'Close-Grip Bench Press', muscleGroups: ['arms', 'chest'], equipment: 'Barbell', defaultSets: 3, defaultReps: '8-10' },
+
+  // Cooldown
+  { id: 'stretching', name: 'Stretching', muscleGroups: ['legs', 'back'], equipment: 'Bodyweight', defaultSets: 1, defaultReps: '10-15 min', manualOnly: true },
 ];
 
 export function getExerciseById(id: string): Exercise | undefined {

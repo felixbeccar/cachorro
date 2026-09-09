@@ -27,6 +27,8 @@ export interface Exercise {
   equipment: string;
   defaultSets: number;
   defaultReps: string;
+  // Excluded from the auto-generated routine (e.g. a cooldown block) — still pickable via "Add exercise".
+  manualOnly?: boolean;
 }
 
 export interface Stretch {
