@@ -2,6 +2,7 @@ module.exports = {
   expo: {
     name: 'cachorro',
     slug: 'cachorro',
+    owner: 'felixbeccar',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
@@ -47,6 +48,11 @@ module.exports = {
     ],
     experiments: {
       typedRoutes: true,
+    },
+    extra: {
+      eas: {
+        projectId: 'e3ee72a0-0029-483c-b983-e2a64c8bb679',
+      },
     },
   },
 };
