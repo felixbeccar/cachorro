@@ -11,11 +11,15 @@ interface Props {
   isNew: boolean;
   sets: SetEntry[];
   done: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   onChangeSet: (setIndex: number, field: 'weightKg' | 'reps', value: string) => void;
   onAddSet: () => void;
   onToggleDone: () => void;
   onChangeExercise: () => void;
   onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }
 
 export function ExerciseCard({
@@ -23,17 +27,29 @@ export function ExerciseCard({
   isNew,
   sets,
   done,
+  canMoveUp,
+  canMoveDown,
   onChangeSet,
   onAddSet,
   onToggleDone,
   onChangeExercise,
   onRemove,
+  onMoveUp,
+  onMoveDown,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
 
   return (
     <View style={[styles.card, done && styles.cardDone]}>
       <Pressable style={styles.header} onPress={() => setExpanded((e) => !e)}>
+        <View style={styles.orderColumn}>
+          <Pressable hitSlop={8} disabled={!canMoveUp} onPress={onMoveUp}>
+            <Ionicons name="chevron-up" size={18} color={canMoveUp ? colors.textMuted : colors.border} />
+          </Pressable>
+          <Pressable hitSlop={8} disabled={!canMoveDown} onPress={onMoveDown}>
+            <Ionicons name="chevron-down" size={18} color={canMoveDown ? colors.textMuted : colors.border} />
+          </Pressable>
+        </View>
         <View style={{ flex: 1 }}>
           <View style={styles.titleRow}>
             <Text style={styles.name}>{exercise.name}</Text>
@@ -125,6 +141,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: spacing.lg,
     alignItems: 'flex-start',
+  },
+  orderColumn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    marginTop: spacing.xs,
+    gap: 2,
   },
   titleRow: {
     flexDirection: 'row',

@@ -151,6 +151,16 @@ export default function TodayScreen() {
     setDoneByExercise((prev) => ({ ...prev, [exerciseId]: !prev[exerciseId] }));
   }
 
+  function handleMove(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= routine.length) return;
+    setRoutine((prev) => {
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   function handleFinish() {
     if (totalSetsLogged === 0) {
       Alert.alert('Nothing logged yet', 'Log at least one set before finishing.');
@@ -210,11 +220,15 @@ export default function TodayScreen() {
           isNew={pick.isNew}
           sets={setsByExercise[pick.exercise.id] ?? []}
           done={!!doneByExercise[pick.exercise.id]}
+          canMoveUp={i > 0}
+          canMoveDown={i < routine.length - 1}
           onChangeSet={(setIndex, field, value) => handleChangeSet(pick.exercise.id, setIndex, field, value)}
           onAddSet={() => handleAddSet(pick.exercise.id)}
           onToggleDone={() => handleToggleDone(pick.exercise.id)}
           onChangeExercise={() => setPickerTarget(i)}
           onRemove={() => handleRemoveExercise(i)}
+          onMoveUp={() => handleMove(i, -1)}
+          onMoveDown={() => handleMove(i, 1)}
         />
       ))}
 
