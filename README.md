@@ -11,16 +11,32 @@ Everything is stored locally on your phone (SQLite) — no backend, no account, 
 - **Stretch tab** — a ~15 minute daily stretching routine as a checklist, a streak counter, and an optional daily local reminder notification.
 - **Activity tab** (iOS only, requires a dev-client build — see below) — reads your recent workouts from Apple Health (padel, walking, running, anything logged there) into a simple list.
 
-## Running it
+## Installing on your iPhone
+
+There are two ways to get this on your phone, depending on whether you want to just try it or actually use it week to week.
+
+### Quick test (5 min, no account needed)
 
 ```bash
 npm install
 npx expo start
 ```
 
-Scan the QR code with **Expo Go** on your phone. Today / Progress / Stretch all work fully in Expo Go.
+Install **Expo Go** from the App Store, scan the QR code the command prints. Today / Progress / Stretch all work fully. This needs your computer running `expo start` and both devices on the same network (or a tunnel) every time you open the app — fine for trying it out, not for daily use. No Apple Health (see below for why).
 
-The **Activity** tab (Apple Health) needs native code that Expo Go doesn't include — see below.
+### Real install — a standalone app icon on your phone, works offline, includes Apple Health
+
+This needs a free [expo.dev](https://expo.dev) account and an [Apple Developer Program](https://developer.apple.com/programs/) membership ($99/year — Apple requires this to install any app, even your own, on a physical iPhone outside the App Store). No Mac needed, it builds in Expo's cloud.
+
+```bash
+npm install -g eas-cli
+eas login                                  # creates/logs into your free expo.dev account
+eas build --profile preview --platform ios # builds in the cloud, ~15-20 min
+```
+
+First run, `eas build` will walk you through logging into your Apple ID and registering your iPhone (it handles certificates/provisioning for you — pick the default/"let Expo handle it" options). When the build finishes it prints a link: open it on your iPhone in Safari and tap **Install**. From then on it's a normal app icon — no dev server, no computer needed, and the Activity tab can request Apple Health access since this is a real native build.
+
+To update the app later after making changes, just re-run the `eas build` command above and reinstall from the new link.
 
 ## Enabling Apple Health (Activity tab)
 
