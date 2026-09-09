@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
 import { ExerciseCard } from '../../components/ExerciseCard';
+import { ExercisePickerModal } from '../../components/ExercisePickerModal';
 import {
   addSessionExercise,
   createSession,
@@ -12,9 +13,9 @@ import {
   getLastSessionExerciseIds,
   upsertSet,
 } from '../../src/db/queries';
-import { generateRoutine, getAlternative } from '../../src/logic/routineGenerator';
+import { generateRoutine } from '../../src/logic/routineGenerator';
 import { colors, radius, spacing } from '../../src/theme';
-import { ExerciseStat, RoutinePick, SetEntry } from '../../src/types';
+import { Exercise, ExerciseStat, RoutinePick, SetEntry } from '../../src/types';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -37,6 +38,8 @@ export default function TodayScreen() {
   const [doneByExercise, setDoneByExercise] = useState<Record<string, boolean>>({});
   const [finished, setFinished] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  // 'add' appends a new exercise; a number replaces the exercise at that index in `routine`.
+  const [pickerTarget, setPickerTarget] = useState<'add' | number | null>(null);
 
   const buildRoutine = useCallback((freshStats: Record<string, ExerciseStat>) => {
     const avoidIds = getLastSessionExerciseIds();
@@ -82,26 +85,44 @@ export default function TodayScreen() {
     setDoneByExercise({});
   }
 
-  function handleSwap(index: number) {
-    const pick = routine[index];
-    const currentIds = routine.map((p) => p.exercise.id);
-    const alt = getAlternative(pick.group, stats, currentIds);
-    if (!alt) {
-      Alert.alert('No alternative', 'No other exercise found for this muscle group.');
-      return;
+  function handleSelectFromPicker(exercise: Exercise) {
+    const isNew = !stats[exercise.id] || stats[exercise.id].timesDone === 0;
+    const newPick: RoutinePick = { exercise, isNew, group: exercise.muscleGroups[0] };
+
+    if (pickerTarget === 'add') {
+      setRoutine((prev) => [...prev, newPick]);
+      setSetsByExercise((prev) => ({ ...prev, [exercise.id]: makeDefaultSets(exercise.defaultSets) }));
+    } else if (typeof pickerTarget === 'number') {
+      const replaced = routine[pickerTarget];
+      const nextRoutine = [...routine];
+      nextRoutine[pickerTarget] = newPick;
+      setRoutine(nextRoutine);
+      setSetsByExercise((prev) => {
+        const next = { ...prev };
+        delete next[replaced.exercise.id];
+        next[exercise.id] = makeDefaultSets(exercise.defaultSets);
+        return next;
+      });
+      setDoneByExercise((prev) => {
+        const next = { ...prev };
+        delete next[replaced.exercise.id];
+        return next;
+      });
     }
-    const nextRoutine = [...routine];
-    nextRoutine[index] = { exercise: alt, isNew: !stats[alt.id] || stats[alt.id].timesDone === 0, group: pick.group };
-    setRoutine(nextRoutine);
+    setPickerTarget(null);
+  }
+
+  function handleRemoveExercise(index: number) {
+    const removed = routine[index];
+    setRoutine((prev) => prev.filter((_, i) => i !== index));
     setSetsByExercise((prev) => {
       const next = { ...prev };
-      delete next[pick.exercise.id];
-      next[alt.id] = makeDefaultSets(alt.defaultSets);
+      delete next[removed.exercise.id];
       return next;
     });
     setDoneByExercise((prev) => {
       const next = { ...prev };
-      delete next[pick.exercise.id];
+      delete next[removed.exercise.id];
       return next;
     });
   }
@@ -192,13 +213,26 @@ export default function TodayScreen() {
           onChangeSet={(setIndex, field, value) => handleChangeSet(pick.exercise.id, setIndex, field, value)}
           onAddSet={() => handleAddSet(pick.exercise.id)}
           onToggleDone={() => handleToggleDone(pick.exercise.id)}
-          onSwap={() => handleSwap(i)}
+          onChangeExercise={() => setPickerTarget(i)}
+          onRemove={() => handleRemoveExercise(i)}
         />
       ))}
+
+      <Pressable style={styles.addExerciseButton} onPress={() => setPickerTarget('add')}>
+        <Ionicons name="add" size={18} color={colors.primary} />
+        <Text style={styles.addExerciseButtonText}>Add exercise</Text>
+      </Pressable>
 
       <Pressable style={styles.primaryButton} onPress={handleFinish}>
         <Text style={styles.primaryButtonText}>Finish workout</Text>
       </Pressable>
+
+      <ExercisePickerModal
+        visible={pickerTarget !== null}
+        excludeIds={routine.map((p) => p.exercise.id)}
+        onSelect={handleSelectFromPicker}
+        onClose={() => setPickerTarget(null)}
+      />
     </ScrollView>
   );
 }
@@ -241,6 +275,23 @@ const styles = StyleSheet.create({
   regenButtonText: {
     color: colors.primary,
     fontSize: 12,
+    fontWeight: '600',
+  },
+  addExerciseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+  },
+  addExerciseButtonText: {
+    color: colors.primary,
+    fontSize: 14,
     fontWeight: '600',
   },
   primaryButton: {

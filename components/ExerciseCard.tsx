@@ -14,10 +14,21 @@ interface Props {
   onChangeSet: (setIndex: number, field: 'weightKg' | 'reps', value: string) => void;
   onAddSet: () => void;
   onToggleDone: () => void;
-  onSwap: () => void;
+  onChangeExercise: () => void;
+  onRemove: () => void;
 }
 
-export function ExerciseCard({ exercise, isNew, sets, done, onChangeSet, onAddSet, onToggleDone, onSwap }: Props) {
+export function ExerciseCard({
+  exercise,
+  isNew,
+  sets,
+  done,
+  onChangeSet,
+  onAddSet,
+  onToggleDone,
+  onChangeExercise,
+  onRemove,
+}: Props) {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -41,6 +52,9 @@ export function ExerciseCard({ exercise, isNew, sets, done, onChangeSet, onAddSe
             {exercise.equipment} · Target {exercise.defaultSets} x {exercise.defaultReps}
           </Text>
         </View>
+        <Pressable hitSlop={10} onPress={onRemove} style={styles.removeButton}>
+          <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
+        </Pressable>
         <Pressable hitSlop={10} onPress={onToggleDone} style={styles.checkbox}>
           <Ionicons
             name={done ? 'checkmark-circle' : 'ellipse-outline'}
@@ -84,9 +98,9 @@ export function ExerciseCard({ exercise, isNew, sets, done, onChangeSet, onAddSe
               <Ionicons name="add" size={16} color={colors.primary} />
               <Text style={styles.footerButtonText}>Add set</Text>
             </Pressable>
-            <Pressable style={styles.footerButton} onPress={onSwap}>
+            <Pressable style={styles.footerButton} onPress={onChangeExercise}>
               <Ionicons name="swap-horizontal" size={16} color={colors.textMuted} />
-              <Text style={[styles.footerButtonText, { color: colors.textMuted }]}>Swap exercise</Text>
+              <Text style={[styles.footerButtonText, { color: colors.textMuted }]}>Change exercise</Text>
             </Pressable>
           </View>
         </View>
@@ -142,6 +156,10 @@ const styles = StyleSheet.create({
   meta: {
     color: colors.textMuted,
     fontSize: 12,
+    marginTop: spacing.xs,
+  },
+  removeButton: {
+    marginLeft: spacing.md,
     marginTop: spacing.xs,
   },
   checkbox: {

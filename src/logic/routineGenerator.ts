@@ -1,5 +1,5 @@
 import { EXERCISES } from '../data/exercises';
-import { Exercise, ExerciseStat, MUSCLE_GROUPS, MuscleGroup, RoutinePick } from '../types';
+import { ExerciseStat, MUSCLE_GROUPS, RoutinePick } from '../types';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -52,23 +52,4 @@ export function generateRoutine(
   }
 
   return picks;
-}
-
-/** Returns the next-best alternative for a muscle group, excluding exercises already in the routine. */
-export function getAlternative(
-  group: MuscleGroup,
-  stats: Record<string, ExerciseStat>,
-  currentRoutineIds: string[]
-): Exercise | null {
-  const excluded = new Set(currentRoutineIds);
-  const candidates = EXERCISES.filter((e) => e.muscleGroups.includes(group) && !excluded.has(e.id));
-  if (candidates.length === 0) return null;
-  const ranked = [...candidates].sort(
-    (a, b) => noveltyScore(b.id, stats) - noveltyScore(a.id, stats)
-  );
-  return ranked[0];
-}
-
-export function primaryGroupFor(exercise: Exercise): MuscleGroup {
-  return exercise.muscleGroups[0];
 }
