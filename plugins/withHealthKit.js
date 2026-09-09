@@ -5,8 +5,8 @@ const { withInfoPlist, withEntitlementsPlist } = require('expo/config-plugins');
 function withHealthKit(config) {
   config = withInfoPlist(config, (cfg) => {
     cfg.modResults.NSHealthShareUsageDescription =
-      'fortyfive reads your workouts (padel, walking, etc.) from Apple Health to show them in your activity history.';
-    cfg.modResults.NSHealthUpdateUsageDescription = 'fortyfive does not write any data to Apple Health.';
+      'cachorro reads your workouts (padel, walking, etc.) from Apple Health to show them in your activity history.';
+    cfg.modResults.NSHealthUpdateUsageDescription = 'cachorro does not write any data to Apple Health.';
     return cfg;
   });
 

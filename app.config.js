@@ -1,18 +1,18 @@
 module.exports = {
   expo: {
-    name: 'fortyfive',
-    slug: 'fortyfive',
+    name: 'cachorro',
+    slug: 'cachorro',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
-    scheme: 'fortyfive',
+    scheme: 'cachorro',
     userInterfaceStyle: 'dark',
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.felixbeccar.fortyfive',
+      bundleIdentifier: 'com.felixbeccar.cachorro',
     },
     android: {
-      package: 'com.felixbeccar.fortyfive',
+      package: 'com.felixbeccar.cachorro',
       adaptiveIcon: {
         backgroundColor: '#0B0F14',
         foregroundImage: './assets/images/android-icon-foreground.png',

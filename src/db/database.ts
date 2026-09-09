@@ -4,7 +4,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export function getDb(): SQLite.SQLiteDatabase {
   if (!db) {
-    db = SQLite.openDatabaseSync('fortyfive.db');
+    db = SQLite.openDatabaseSync('cachorro.db');
   }
   return db;
 }

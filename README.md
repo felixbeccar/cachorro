@@ -1,4 +1,4 @@
-# fortyfive
+# cachorro
 
 A simple, personal gym app: a ~45 minute well-rounded workout you can run through twice a week, daily 15-minute stretching with reminders, progress tracking over time, and (on iOS, with a custom build) your Apple Health workouts (padel, walking, etc.) pulled into one activity view.
 
