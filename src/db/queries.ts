@@ -1,5 +1,14 @@
 import { getDb } from './database';
-import { EffortLevel, ExerciseHistoryPoint, ExerciseStat, PreviousExerciseLog, SessionRow } from '../types';
+import {
+  EffortLevel,
+  ExerciseHistoryPoint,
+  ExerciseStat,
+  PlannedSession,
+  PreviousExerciseLog,
+  ScheduleActivity,
+  SessionRow,
+  WeeklySchedule,
+} from '../types';
 
 export function createSession(dateISO: string): number {
   const result = getDb().runSync('INSERT INTO sessions (date) VALUES (?)', [dateISO]);
@@ -173,6 +182,76 @@ export function getLastSessionExerciseIds(): string[] {
     [last.id]
   );
   return rows.map((r) => r.exercise_id);
+}
+
+export function getWeeklySchedule(): WeeklySchedule {
+  const rows = getDb().getAllSync<{ day_of_week: number; activity: string }>(
+    'SELECT day_of_week, activity FROM weekly_schedule'
+  );
+  const schedule: WeeklySchedule = {};
+  for (const row of rows) {
+    schedule[row.day_of_week] = row.activity as ScheduleActivity;
+  }
+  return schedule;
+}
+
+export function setDaySchedule(dayOfWeek: number, activity: ScheduleActivity) {
+  getDb().runSync(
+    `INSERT INTO weekly_schedule (day_of_week, activity) VALUES (?, ?)
+     ON CONFLICT(day_of_week) DO UPDATE SET activity = excluded.activity`,
+    [dayOfWeek, activity]
+  );
+}
+
+export function getPlannedSession(dateISO: string): PlannedSession | null {
+  const row = getDb().getFirstSync<{ id: number; date: string }>(
+    'SELECT id, date FROM planned_sessions WHERE date = ?',
+    [dateISO]
+  );
+  if (!row) return null;
+  const exercises = getDb().getAllSync<{ id: number; exercise_id: string; order_index: number }>(
+    'SELECT id, exercise_id, order_index FROM planned_session_exercises WHERE planned_session_id = ? ORDER BY order_index ASC',
+    [row.id]
+  );
+  return {
+    id: row.id,
+    date: row.date,
+    exercises: exercises.map((e) => ({ id: e.id, exerciseId: e.exercise_id, orderIndex: e.order_index })),
+  };
+}
+
+export function createPlannedSession(dateISO: string, exerciseIds: string[]): PlannedSession {
+  const result = getDb().runSync('INSERT INTO planned_sessions (date) VALUES (?)', [dateISO]);
+  const plannedSessionId = result.lastInsertRowId;
+  exerciseIds.forEach((exerciseId, index) => {
+    getDb().runSync(
+      'INSERT INTO planned_session_exercises (planned_session_id, exercise_id, order_index) VALUES (?, ?, ?)',
+      [plannedSessionId, exerciseId, index]
+    );
+  });
+  return getPlannedSession(dateISO)!;
+}
+
+/** Replaces a planned session's exercise list wholesale — simpler and safer than granular mutations. */
+export function setPlannedSessionExercises(plannedSessionId: number, exerciseIds: string[]) {
+  getDb().withTransactionSync(() => {
+    getDb().runSync('DELETE FROM planned_session_exercises WHERE planned_session_id = ?', [plannedSessionId]);
+    exerciseIds.forEach((exerciseId, index) => {
+      getDb().runSync(
+        'INSERT INTO planned_session_exercises (planned_session_id, exercise_id, order_index) VALUES (?, ?, ?)',
+        [plannedSessionId, exerciseId, index]
+      );
+    });
+  });
+}
+
+export function deletePlannedSessionForDate(dateISO: string) {
+  const row = getDb().getFirstSync<{ id: number }>('SELECT id FROM planned_sessions WHERE date = ?', [dateISO]);
+  if (!row) return;
+  getDb().withTransactionSync(() => {
+    getDb().runSync('DELETE FROM planned_session_exercises WHERE planned_session_id = ?', [row.id]);
+    getDb().runSync('DELETE FROM planned_sessions WHERE id = ?', [row.id]);
+  });
 }
 
 export function getSessionCountSince(sinceISO: string): number {

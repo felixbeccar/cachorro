@@ -5,12 +5,15 @@ import { useFocusEffect } from 'expo-router';
 
 import { ExerciseCard } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
+import { getExerciseById } from '../src/data/exercises';
 import {
   addSessionExercise,
   createSession,
+  deletePlannedSessionForDate,
   finishSession,
   getExerciseStats,
   getLastSessionExerciseIds,
+  getPlannedSession,
   getPreviousExerciseLog,
   upsertSet,
 } from '../src/db/queries';
@@ -44,8 +47,23 @@ export function WorkoutMode() {
   const [pickerTarget, setPickerTarget] = useState<'add' | number | null>(null);
 
   const buildRoutine = useCallback((freshStats: Record<string, ExerciseStat>) => {
-    const avoidIds = getLastSessionExerciseIds();
-    const picks = generateRoutine(freshStats, avoidIds);
+    const planned = getPlannedSession(todayISO());
+    let picks: RoutinePick[];
+    if (planned && planned.exercises.length > 0) {
+      // Today was set up from the Plan tab — use that instead of generating a fresh one, so
+      // edits made there actually show up here.
+      picks = planned.exercises
+        .map((pe) => getExerciseById(pe.exerciseId))
+        .filter((e): e is Exercise => !!e)
+        .map((exercise) => ({
+          exercise,
+          isNew: !freshStats[exercise.id] || freshStats[exercise.id].timesDone === 0,
+          group: exercise.muscleGroups[0],
+        }));
+    } else {
+      const avoidIds = getLastSessionExerciseIds();
+      picks = generateRoutine(freshStats, avoidIds);
+    }
     const sets: Record<string, SetEntry[]> = {};
     for (const pick of picks) {
       sets[pick.exercise.id] = makeDefaultSets(pick.exercise.defaultSets);
@@ -204,6 +222,7 @@ export function WorkoutMode() {
       });
     });
     finishSession(sessionId, new Date().toISOString());
+    deletePlannedSessionForDate(todayISO());
     setFinished(true);
   }
 

@@ -82,3 +82,29 @@ export interface PreviousExerciseLog {
   sets: { weightKg: number | null; reps: number | null }[];
   effort: EffortLevel | null;
 }
+
+export type ScheduleActivity = 'gym' | 'padel' | 'pilates' | 'rest';
+
+export const SCHEDULE_ACTIVITY_LABEL: Record<ScheduleActivity, string> = {
+  gym: 'Gym',
+  padel: 'Padel',
+  pilates: 'Pilates',
+  rest: 'Rest',
+};
+
+export const SCHEDULE_ACTIVITY_ORDER: ScheduleActivity[] = ['gym', 'padel', 'pilates', 'rest'];
+
+// JS Date#getDay() convention: 0 = Sunday ... 6 = Saturday.
+export type WeeklySchedule = Record<number, ScheduleActivity>;
+
+export interface PlannedSessionExercise {
+  id: number;
+  exerciseId: string;
+  orderIndex: number;
+}
+
+export interface PlannedSession {
+  id: number;
+  date: string;
+  exercises: PlannedSessionExercise[];
+}
