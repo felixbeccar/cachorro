@@ -16,7 +16,10 @@ export interface HealthWorkout {
 let AppleHealthKit: any = null;
 if (Platform.OS === 'ios') {
   try {
-    AppleHealthKit = require('react-native-health').default;
+    // react-native-health does `module.exports = HealthKit` (plain CommonJS, no ESM default
+    // wrapper) — requiring `.default` here silently resolved to undefined and made the app
+    // think HealthKit was never linked, even in a real native build.
+    AppleHealthKit = require('react-native-health');
   } catch {
     AppleHealthKit = null;
   }
