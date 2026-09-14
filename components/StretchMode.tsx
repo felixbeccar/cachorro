@@ -3,15 +3,15 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
-import { STRETCHES, STRETCH_TOTAL_SECONDS } from '../../src/data/stretches';
-import { getStretchLog, getStretchStreak, setStretchLogCompleted } from '../../src/db/queries';
+import { STRETCHES, STRETCH_TOTAL_SECONDS } from '../src/data/stretches';
+import { getStretchLog, getStretchStreak, setStretchLogCompleted } from '../src/db/queries';
 import {
   cancelDailyStretchReminder,
   getStretchReminderTime,
   requestNotificationPermission,
   scheduleDailyStretchReminder,
-} from '../../src/notifications/reminders';
-import { colors, radius, spacing } from '../../src/theme';
+} from '../src/notifications/reminders';
+import { colors, radius, spacing } from '../src/theme';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -33,7 +33,7 @@ function formatTime(hour: number, minute: number) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-export default function StretchScreen() {
+export function StretchMode() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [streak, setStreak] = useState(0);
   const [reminderOn, setReminderOn] = useState(false);

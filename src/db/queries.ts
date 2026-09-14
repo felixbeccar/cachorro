@@ -175,6 +175,50 @@ export function getLastSessionExerciseIds(): string[] {
   return rows.map((r) => r.exercise_id);
 }
 
+export function getSessionCountSince(sinceISO: string): number {
+  const row = getDb().getFirstSync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM sessions WHERE finished_at IS NOT NULL AND date >= ?',
+    [sinceISO]
+  );
+  return row?.count ?? 0;
+}
+
+export function getTotalVolumeSince(sinceISO: string): number {
+  const row = getDb().getFirstSync<{ total: number | null }>(
+    `
+    SELECT SUM(COALESCE(st.weight_kg, 0) * COALESCE(st.reps, 0)) AS total
+    FROM sets st
+    JOIN session_exercises se ON se.id = st.session_exercise_id
+    JOIN sessions s ON s.id = se.session_id
+    WHERE s.finished_at IS NOT NULL AND s.date >= ?
+    `,
+    [sinceISO]
+  );
+  return row?.total ?? 0;
+}
+
+/** All finished session dates, most recent first — used to compute a weekly training streak. */
+export function getAllSessionDates(): string[] {
+  const rows = getDb().getAllSync<{ date: string }>(
+    'SELECT date FROM sessions WHERE finished_at IS NOT NULL ORDER BY date DESC'
+  );
+  return rows.map((r) => r.date);
+}
+
+/** One row per exercise performed since the given date (not deduped) — used for muscle-group balance. */
+export function getExerciseIdsSince(sinceISO: string): string[] {
+  const rows = getDb().getAllSync<{ exercise_id: string }>(
+    `
+    SELECT se.exercise_id AS exercise_id
+    FROM session_exercises se
+    JOIN sessions s ON s.id = se.session_id
+    WHERE s.finished_at IS NOT NULL AND s.date >= ?
+    `,
+    [sinceISO]
+  );
+  return rows.map((r) => r.exercise_id);
+}
+
 export function getLoggedExerciseIds(): string[] {
   const rows = getDb().getAllSync<{ exercise_id: string }>(`
     SELECT DISTINCT se.exercise_id AS exercise_id

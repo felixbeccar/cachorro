@@ -3,17 +3,25 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
+import { MuscleBalanceChart } from '../../components/MuscleBalanceChart';
 import { ProgressChart } from '../../components/ProgressChart';
 import { getExerciseById } from '../../src/data/exercises';
 import {
   deleteSession,
+  getAllSessionDates,
   getExerciseHistory,
+  getExerciseIdsSince,
   getLoggedExerciseIds,
+  getSessionCountSince,
   getSessionDetail,
+  getTotalVolumeSince,
   listSessions,
 } from '../../src/db/queries';
+import { computeMuscleGroupCounts, computeWeeklyStreak, daysAgoISO } from '../../src/logic/stats';
 import { colors, radius, spacing } from '../../src/theme';
-import { EFFORT_LABEL, ExerciseHistoryPoint, SessionRow } from '../../src/types';
+import { EFFORT_LABEL, ExerciseHistoryPoint, MuscleGroup, SessionRow } from '../../src/types';
+
+const DASHBOARD_WINDOW_DAYS = 30;
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -25,6 +33,10 @@ export default function ProgressScreen() {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   const [history, setHistory] = useState<ExerciseHistoryPoint[]>([]);
   const [expandedSessionId, setExpandedSessionId] = useState<number | null>(null);
+  const [sessionsInWindow, setSessionsInWindow] = useState(0);
+  const [volumeInWindow, setVolumeInWindow] = useState(0);
+  const [weeklyStreak, setWeeklyStreak] = useState(0);
+  const [muscleGroupCounts, setMuscleGroupCounts] = useState<Record<MuscleGroup, number> | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -33,6 +45,12 @@ export default function ProgressScreen() {
       setSessions(allSessions);
       setExerciseIds(ids);
       setSelectedExerciseId((prev) => prev ?? ids[0] ?? null);
+
+      const since = daysAgoISO(DASHBOARD_WINDOW_DAYS);
+      setSessionsInWindow(getSessionCountSince(since));
+      setVolumeInWindow(getTotalVolumeSince(since));
+      setWeeklyStreak(computeWeeklyStreak(getAllSessionDates()));
+      setMuscleGroupCounts(computeMuscleGroupCounts(getExerciseIdsSince(since)));
     }, [])
   );
 
@@ -69,6 +87,12 @@ export default function ProgressScreen() {
           const nextSelected = selectedExerciseId && ids.includes(selectedExerciseId) ? selectedExerciseId : ids[0] ?? null;
           setSelectedExerciseId(nextSelected);
           setHistory(nextSelected ? getExerciseHistory(nextSelected) : []);
+
+          const since = daysAgoISO(DASHBOARD_WINDOW_DAYS);
+          setSessionsInWindow(getSessionCountSince(since));
+          setVolumeInWindow(getTotalVolumeSince(since));
+          setWeeklyStreak(computeWeeklyStreak(getAllSessionDates()));
+          setMuscleGroupCounts(computeMuscleGroupCounts(getExerciseIdsSince(since)));
         },
       },
     ]);
@@ -76,6 +100,35 @@ export default function ProgressScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>Progress</Text>
+
+      <View style={styles.kpiRow}>
+        <View style={styles.kpiTile}>
+          <Text style={styles.kpiValue}>{sessionsInWindow}</Text>
+          <Text style={styles.kpiLabel}>Sessions{'\n'}last 30d</Text>
+        </View>
+        <View style={styles.kpiTile}>
+          <Text style={styles.kpiValue}>{weeklyStreak}</Text>
+          <Text style={styles.kpiLabel}>Week{'\n'}streak</Text>
+        </View>
+        <View style={styles.kpiTile}>
+          <Text style={styles.kpiValue}>{Math.round(volumeInWindow / 1000)}k</Text>
+          <Text style={styles.kpiLabel}>kg lifted{'\n'}last 30d</Text>
+        </View>
+      </View>
+
+      <Text style={styles.sectionTitle}>Muscle balance</Text>
+      <Text style={styles.sectionCaption}>Times each muscle group was trained, last 30 days</Text>
+      {muscleGroupCounts && Object.values(muscleGroupCounts).every((c) => c === 0) ? (
+        <Text style={styles.emptyText}>Finish a workout to see your balance across muscle groups.</Text>
+      ) : (
+        muscleGroupCounts && (
+          <View style={styles.card}>
+            <MuscleBalanceChart counts={muscleGroupCounts} />
+          </View>
+        )
+      )}
+
       <Text style={styles.sectionTitle}>Exercise trend</Text>
       {exerciseIds.length === 0 ? (
         <Text style={styles.emptyText}>Finish a workout to start tracking progress.</Text>
@@ -170,11 +223,49 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xl * 2,
   },
+  title: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: spacing.lg,
+  },
+  kpiRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  kpiTile: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  kpiValue: {
+    color: colors.primary,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  kpiLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 14,
+  },
   sectionTitle: {
     color: colors.text,
     fontSize: 16,
     fontWeight: '700',
     marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  sectionCaption: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: -spacing.xs,
     marginBottom: spacing.sm,
   },
   emptyText: {

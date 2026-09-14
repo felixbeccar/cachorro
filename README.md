@@ -6,10 +6,12 @@ Everything is stored locally on your phone (SQLite) — no backend, no account, 
 
 ## Features
 
-- **Today tab** — generates a ~45 min routine covering every major muscle group (chest, back, shoulders, legs, glutes, core, arms). It favors exercises you haven't done, or haven't done in a while, over ones you keep repeating, and avoids exactly repeating last session's picks. Tap the checkmark to mark an exercise done, log weight/reps per set, swap any exercise for an alternative, or regenerate the whole routine.
-- **Progress tab** — every finished session, plus a weight-over-time trend and personal best for any exercise you've logged.
-- **Stretch tab** — a ~15 minute daily stretching routine as a checklist, a streak counter, and an optional daily local reminder notification.
-- **Activity tab** (iOS only, requires a dev-client build — see below) — reads your recent workouts from Apple Health (padel, walking, running, anything logged there) into a simple list.
+- **Today tab** — a Workout/Stretch switch at the top.
+  - **Workout mode**: generates a ~45 min routine covering every major muscle group (chest, back, shoulders, legs, glutes, core, arms). It favors exercises you haven't done, or haven't done in a while, over ones you keep repeating, and avoids exactly repeating last session's picks. Tap the checkmark to mark an exercise done, log weight/reps per set + an effort rating, see how it went last time, swap/add/remove/reorder exercises, or regenerate the whole routine. Each exercise has a rest timer.
+  - **Stretch mode**: a ~15 minute daily stretching routine as a checklist, a streak counter, and an optional daily local reminder notification.
+- **Plan tab** — a forecast of today's session plus the next two, generated the same way as Workout mode. Not a fixed schedule — it's a preview that shifts based on what you actually log.
+- **Progress tab** — a dashboard: sessions/volume in the last 30 days, a weekly training streak, a muscle-group balance chart (are you neglecting legs?), a weight-over-time trend and personal best per exercise, and full session history (deletable).
+- **Activity tab** (iOS only, requires a dev-client/EAS build — see below) — reads your recent workouts from Apple Health (padel, walking, running, anything logged there) into a simple list.
 
 ## Installing on your iPhone
 
@@ -90,14 +92,16 @@ There's no server and no export yet — data lives on-device. If you want a back
 ## Project structure
 
 ```
-app/(tabs)/        expo-router screens: index (Today), progress, stretch, activity
-components/        ExerciseCard, ProgressChart, MuscleBadge
+app/(tabs)/        expo-router screens: index (Today shell), plan, progress, activity
+components/        WorkoutMode, StretchMode, ExerciseCard, ExercisePickerModal, RestTimer,
+                   ProgressChart, MuscleBalanceChart, MuscleBadge
 src/data/          exercise library, stretch routine
 src/db/            SQLite schema + queries
-src/logic/         routine generator
+src/logic/         routine generator, dashboard stats (streaks, muscle balance)
 src/health/        HealthKit wrapper (guarded so it's a no-op outside a dev-client build)
 src/notifications/ daily stretch reminder scheduling
 plugins/           local Expo config plugin adding the HealthKit entitlement
+patches/           patch-package fix for react-native-health's New Architecture bug
 ```
 
 ## Stack
