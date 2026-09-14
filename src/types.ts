@@ -68,3 +68,17 @@ export interface ExerciseHistoryPoint {
   maxWeightKg: number | null;
   totalReps: number;
 }
+
+export type EffortLevel = 'easy' | 'mid' | 'hard';
+
+export const EFFORT_LABEL: Record<EffortLevel, string> = {
+  easy: 'Easy',
+  mid: 'Mid',
+  hard: 'Hard',
+};
+
+export interface PreviousExerciseLog {
+  date: string;
+  sets: { weightKg: number | null; reps: number | null }[];
+  effort: EffortLevel | null;
+}

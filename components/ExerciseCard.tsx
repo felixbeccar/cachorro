@@ -3,9 +3,26 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, radius, spacing } from '../src/theme';
-import { Exercise, SetEntry } from '../src/types';
+import { EFFORT_LABEL, EffortLevel, Exercise, PreviousExerciseLog, SetEntry } from '../src/types';
 import { MuscleBadge } from './MuscleBadge';
 import { RestTimer } from './RestTimer';
+
+const EFFORT_LEVELS: EffortLevel[] = ['easy', 'mid', 'hard'];
+
+function formatShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function summarizePreviousSets(sets: { weightKg: number | null; reps: number | null }[]): string {
+  const logged = sets.filter((s) => s.weightKg != null || s.reps != null);
+  if (logged.length === 0) return 'no sets logged';
+  const first = logged[0];
+  const allSame = logged.every((s) => s.weightKg === first.weightKg && s.reps === first.reps);
+  if (allSame) {
+    return `${logged.length}×${first.weightKg ?? '-'}kg×${first.reps ?? '-'}`;
+  }
+  return logged.map((s) => `${s.weightKg ?? '-'}kg×${s.reps ?? '-'}`).join(', ');
+}
 
 interface Props {
   exercise: Exercise;
@@ -14,6 +31,8 @@ interface Props {
   done: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  previousLog: PreviousExerciseLog | null;
+  effort: EffortLevel | null;
   onChangeSet: (setIndex: number, field: 'weightKg' | 'reps', value: string) => void;
   onAddSet: () => void;
   onToggleDone: () => void;
@@ -21,6 +40,7 @@ interface Props {
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onSetEffort: (effort: EffortLevel) => void;
 }
 
 export function ExerciseCard({
@@ -30,6 +50,8 @@ export function ExerciseCard({
   done,
   canMoveUp,
   canMoveDown,
+  previousLog,
+  effort,
   onChangeSet,
   onAddSet,
   onToggleDone,
@@ -37,6 +59,7 @@ export function ExerciseCard({
   onRemove,
   onMoveUp,
   onMoveDown,
+  onSetEffort,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
 
@@ -68,6 +91,12 @@ export function ExerciseCard({
           <Text style={styles.meta}>
             {exercise.equipment} · Target {exercise.defaultSets} x {exercise.defaultReps}
           </Text>
+          {previousLog && (
+            <Text style={styles.previousText}>
+              Previous: {formatShortDate(previousLog.date)} · {summarizePreviousSets(previousLog.sets)}
+              {previousLog.effort ? ` · Effort: ${EFFORT_LABEL[previousLog.effort]}` : ''}
+            </Text>
+          )}
         </View>
         <Pressable hitSlop={10} onPress={onRemove} style={styles.removeButton}>
           <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
@@ -109,6 +138,24 @@ export function ExerciseCard({
               />
             </View>
           ))}
+
+          <View style={styles.effortRow}>
+            <Text style={styles.effortLabel}>Effort</Text>
+            {EFFORT_LEVELS.map((level) => {
+              const active = effort === level;
+              return (
+                <Pressable
+                  key={level}
+                  onPress={() => onSetEffort(level)}
+                  style={[styles.effortPill, active && styles.effortPillActive]}
+                >
+                  <Text style={[styles.effortPillText, active && styles.effortPillTextActive]}>
+                    {EFFORT_LABEL[level]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
           <View style={styles.footerRow}>
             <Pressable style={styles.footerButton} onPress={onAddSet}>
@@ -184,6 +231,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: spacing.xs,
   },
+  previousText: {
+    color: colors.primary,
+    fontSize: 12,
+    marginTop: spacing.xs,
+  },
   removeButton: {
     marginLeft: spacing.md,
     marginTop: spacing.xs,
@@ -226,6 +278,36 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: spacing.sm,
     fontSize: 14,
+  },
+  effortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  effortLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginRight: spacing.xs,
+  },
+  effortPill: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  effortPillActive: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primary,
+  },
+  effortPillText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  effortPillTextActive: {
+    color: colors.primary,
   },
   footerRow: {
     flexDirection: 'row',

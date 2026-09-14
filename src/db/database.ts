@@ -24,7 +24,8 @@ export function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id INTEGER NOT NULL,
       exercise_id TEXT NOT NULL,
-      order_index INTEGER NOT NULL
+      order_index INTEGER NOT NULL,
+      effort TEXT
     );
 
     CREATE TABLE IF NOT EXISTS sets (
@@ -44,4 +45,11 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_session_exercises_exercise ON session_exercises(exercise_id);
     CREATE INDEX IF NOT EXISTS idx_sets_session_exercise ON sets(session_exercise_id);
   `);
+
+  // Migration for databases created before the `effort` column existed.
+  try {
+    database.execSync('ALTER TABLE session_exercises ADD COLUMN effort TEXT');
+  } catch {
+    // Column already exists.
+  }
 }

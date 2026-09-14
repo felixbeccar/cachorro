@@ -1,5 +1,5 @@
 import { getDb } from './database';
-import { ExerciseHistoryPoint, ExerciseStat, SessionRow } from '../types';
+import { EffortLevel, ExerciseHistoryPoint, ExerciseStat, PreviousExerciseLog, SessionRow } from '../types';
 
 export function createSession(dateISO: string): number {
   const result = getDb().runSync('INSERT INTO sessions (date) VALUES (?)', [dateISO]);
@@ -10,10 +10,15 @@ export function finishSession(sessionId: number, finishedAtISO: string) {
   getDb().runSync('UPDATE sessions SET finished_at = ? WHERE id = ?', [finishedAtISO, sessionId]);
 }
 
-export function addSessionExercise(sessionId: number, exerciseId: string, orderIndex: number): number {
+export function addSessionExercise(
+  sessionId: number,
+  exerciseId: string,
+  orderIndex: number,
+  effort: EffortLevel | null = null
+): number {
   const result = getDb().runSync(
-    'INSERT INTO session_exercises (session_id, exercise_id, order_index) VALUES (?, ?, ?)',
-    [sessionId, exerciseId, orderIndex]
+    'INSERT INTO session_exercises (session_id, exercise_id, order_index, effort) VALUES (?, ?, ?, ?)',
+    [sessionId, exerciseId, orderIndex, effort]
   );
   return result.lastInsertRowId;
 }
@@ -78,12 +83,13 @@ export function listSessions(): SessionRow[] {
 export interface SessionExerciseDetail {
   sessionExerciseId: number;
   exerciseId: string;
+  effort: EffortLevel | null;
   sets: { setIndex: number; weightKg: number | null; reps: number | null }[];
 }
 
 export function getSessionDetail(sessionId: number): SessionExerciseDetail[] {
-  const exRows = getDb().getAllSync<{ id: number; exercise_id: string }>(
-    'SELECT id, exercise_id FROM session_exercises WHERE session_id = ? ORDER BY order_index ASC',
+  const exRows = getDb().getAllSync<{ id: number; exercise_id: string; effort: string | null }>(
+    'SELECT id, exercise_id, effort FROM session_exercises WHERE session_id = ? ORDER BY order_index ASC',
     [sessionId]
   );
   return exRows.map((ex) => {
@@ -93,8 +99,36 @@ export function getSessionDetail(sessionId: number): SessionExerciseDetail[] {
         [ex.id]
       )
       .map((s) => ({ setIndex: s.set_index, weightKg: s.weight_kg, reps: s.reps }));
-    return { sessionExerciseId: ex.id, exerciseId: ex.exercise_id, sets };
+    return {
+      sessionExerciseId: ex.id,
+      exerciseId: ex.exercise_id,
+      effort: (ex.effort as EffortLevel | null) ?? null,
+      sets,
+    };
   });
+}
+
+/** Most recent finished log of this exercise, for the "how did it go last time" recall on the Today card. */
+export function getPreviousExerciseLog(exerciseId: string): PreviousExerciseLog | null {
+  const row = getDb().getFirstSync<{ session_exercise_id: number; date: string; effort: string | null }>(
+    `
+    SELECT se.id AS session_exercise_id, s.date AS date, se.effort AS effort
+    FROM session_exercises se
+    JOIN sessions s ON s.id = se.session_id
+    WHERE se.exercise_id = ? AND s.finished_at IS NOT NULL
+    ORDER BY s.date DESC, s.id DESC
+    LIMIT 1
+    `,
+    [exerciseId]
+  );
+  if (!row) return null;
+  const sets = getDb()
+    .getAllSync<{ weight_kg: number | null; reps: number | null }>(
+      'SELECT weight_kg, reps FROM sets WHERE session_exercise_id = ? ORDER BY set_index ASC',
+      [row.session_exercise_id]
+    )
+    .map((s) => ({ weightKg: s.weight_kg, reps: s.reps }));
+  return { date: row.date, sets, effort: (row.effort as EffortLevel | null) ?? null };
 }
 
 export function deleteSession(sessionId: number) {

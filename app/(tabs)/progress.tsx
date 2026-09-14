@@ -13,7 +13,7 @@ import {
   listSessions,
 } from '../../src/db/queries';
 import { colors, radius, spacing } from '../../src/theme';
-import { ExerciseHistoryPoint, SessionRow } from '../../src/types';
+import { EFFORT_LABEL, ExerciseHistoryPoint, SessionRow } from '../../src/types';
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -152,6 +152,7 @@ function SessionDetail({ sessionId }: { sessionId: number }) {
                 .filter((s) => s.weightKg != null || s.reps != null)
                 .map((s) => `${s.weightKg ?? '-'}kg×${s.reps ?? '-'}`)
                 .join('  ') || 'no sets logged'}
+              {ex.effort ? `  ·  Effort: ${EFFORT_LABEL[ex.effort]}` : ''}
             </Text>
           </View>
         );

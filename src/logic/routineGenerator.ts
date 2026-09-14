@@ -53,3 +53,24 @@ export function generateRoutine(
 
   return picks;
 }
+
+/**
+ * A rough look-ahead at the next few sessions, purely as a preview: each one is generated the
+ * same way as "today", just avoiding the exercise picked for the session right before it. It is
+ * NOT a fixed schedule — the real thing regenerates from your actual logged history every time,
+ * so this will shift once you finish today's session (or skip a few, or swap exercises around).
+ */
+export function previewUpcomingSessions(
+  stats: Record<string, ExerciseStat>,
+  currentRoutineIds: string[],
+  count: number
+): RoutinePick[][] {
+  const sessions: RoutinePick[][] = [];
+  let avoidIds = currentRoutineIds;
+  for (let i = 0; i < count; i++) {
+    const picks = generateRoutine(stats, avoidIds);
+    sessions.push(picks);
+    avoidIds = picks.map((p) => p.exercise.id);
+  }
+  return sessions;
+}

@@ -11,11 +11,12 @@ import {
   finishSession,
   getExerciseStats,
   getLastSessionExerciseIds,
+  getPreviousExerciseLog,
   upsertSet,
 } from '../../src/db/queries';
-import { generateRoutine } from '../../src/logic/routineGenerator';
+import { generateRoutine, previewUpcomingSessions } from '../../src/logic/routineGenerator';
 import { colors, radius, spacing } from '../../src/theme';
-import { Exercise, ExerciseStat, RoutinePick, SetEntry } from '../../src/types';
+import { EffortLevel, Exercise, ExerciseStat, PreviousExerciseLog, RoutinePick, SetEntry } from '../../src/types';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -36,6 +37,7 @@ export default function TodayScreen() {
   const [routine, setRoutine] = useState<RoutinePick[]>([]);
   const [setsByExercise, setSetsByExercise] = useState<Record<string, SetEntry[]>>({});
   const [doneByExercise, setDoneByExercise] = useState<Record<string, boolean>>({});
+  const [effortByExercise, setEffortByExercise] = useState<Record<string, EffortLevel | null>>({});
   const [finished, setFinished] = useState(false);
   const [loaded, setLoaded] = useState(false);
   // 'add' appends a new exercise; a number replaces the exercise at that index in `routine`.
@@ -51,6 +53,7 @@ export default function TodayScreen() {
     setRoutine(picks);
     setSetsByExercise(sets);
     setDoneByExercise({});
+    setEffortByExercise({});
     setFinished(false);
   }, []);
 
@@ -71,6 +74,23 @@ export default function TodayScreen() {
       .filter((s) => s.reps != null).length;
   }, [setsByExercise]);
 
+  const previousLogByExercise = useMemo(() => {
+    const map: Record<string, PreviousExerciseLog | null> = {};
+    for (const pick of routine) {
+      map[pick.exercise.id] = getPreviousExerciseLog(pick.exercise.id);
+    }
+    return map;
+  }, [routine]);
+
+  const upcomingPreview = useMemo(() => {
+    if (routine.length === 0) return [];
+    return previewUpcomingSessions(
+      stats,
+      routine.map((p) => p.exercise.id),
+      2
+    );
+  }, [routine, stats]);
+
   function handleRegenerate() {
     const currentIds = routine.map((p) => p.exercise.id);
     const freshStats = getExerciseStats();
@@ -83,6 +103,7 @@ export default function TodayScreen() {
     setRoutine(picks);
     setSetsByExercise(sets);
     setDoneByExercise({});
+    setEffortByExercise({});
   }
 
   function handleSelectFromPicker(exercise: Exercise) {
@@ -108,6 +129,11 @@ export default function TodayScreen() {
         delete next[replaced.exercise.id];
         return next;
       });
+      setEffortByExercise((prev) => {
+        const next = { ...prev };
+        delete next[replaced.exercise.id];
+        return next;
+      });
     }
     setPickerTarget(null);
   }
@@ -121,6 +147,11 @@ export default function TodayScreen() {
       return next;
     });
     setDoneByExercise((prev) => {
+      const next = { ...prev };
+      delete next[removed.exercise.id];
+      return next;
+    });
+    setEffortByExercise((prev) => {
       const next = { ...prev };
       delete next[removed.exercise.id];
       return next;
@@ -151,6 +182,10 @@ export default function TodayScreen() {
     setDoneByExercise((prev) => ({ ...prev, [exerciseId]: !prev[exerciseId] }));
   }
 
+  function handleSetEffort(exerciseId: string, effort: EffortLevel) {
+    setEffortByExercise((prev) => ({ ...prev, [exerciseId]: prev[exerciseId] === effort ? null : effort }));
+  }
+
   function handleMove(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= routine.length) return;
@@ -168,7 +203,8 @@ export default function TodayScreen() {
     }
     const sessionId = createSession(todayISO());
     routine.forEach((pick, orderIndex) => {
-      const sessionExerciseId = addSessionExercise(sessionId, pick.exercise.id, orderIndex);
+      const effort = effortByExercise[pick.exercise.id] ?? null;
+      const sessionExerciseId = addSessionExercise(sessionId, pick.exercise.id, orderIndex, effort);
       const sets = setsByExercise[pick.exercise.id] ?? [];
       sets.forEach((set) => {
         if (set.weightKg != null || set.reps != null) {
@@ -222,6 +258,8 @@ export default function TodayScreen() {
           done={!!doneByExercise[pick.exercise.id]}
           canMoveUp={i > 0}
           canMoveDown={i < routine.length - 1}
+          previousLog={previousLogByExercise[pick.exercise.id] ?? null}
+          effort={effortByExercise[pick.exercise.id] ?? null}
           onChangeSet={(setIndex, field, value) => handleChangeSet(pick.exercise.id, setIndex, field, value)}
           onAddSet={() => handleAddSet(pick.exercise.id)}
           onToggleDone={() => handleToggleDone(pick.exercise.id)}
@@ -229,6 +267,7 @@ export default function TodayScreen() {
           onRemove={() => handleRemoveExercise(i)}
           onMoveUp={() => handleMove(i, -1)}
           onMoveDown={() => handleMove(i, 1)}
+          onSetEffort={(effort) => handleSetEffort(pick.exercise.id, effort)}
         />
       ))}
 
@@ -240,6 +279,27 @@ export default function TodayScreen() {
       <Pressable style={styles.primaryButton} onPress={handleFinish}>
         <Text style={styles.primaryButtonText}>Finish workout</Text>
       </Pressable>
+
+      {upcomingPreview.length > 0 && (
+        <View style={styles.upcomingSection}>
+          <Text style={styles.upcomingHeading}>Coming up (preview)</Text>
+          <Text style={styles.upcomingCaption}>
+            A rough look-ahead, not a fixed schedule — it updates based on what you actually log.
+          </Text>
+          {upcomingPreview.map((picks, i) => (
+            <View key={i} style={styles.upcomingCard}>
+              <Text style={styles.upcomingCardTitle}>Session {i + 2}</Text>
+              <View style={styles.upcomingChipsRow}>
+                {picks.map((p) => (
+                  <View key={p.exercise.id} style={styles.upcomingChip}>
+                    <Text style={styles.upcomingChipText}>{p.exercise.name}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       <ExercisePickerModal
         visible={pickerTarget !== null}
@@ -338,5 +398,48 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     marginBottom: spacing.lg,
+  },
+  upcomingSection: {
+    marginTop: spacing.xl,
+  },
+  upcomingHeading: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  upcomingCaption: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+    marginBottom: spacing.md,
+  },
+  upcomingCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  upcomingCardTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  upcomingChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  upcomingChip: {
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  upcomingChipText: {
+    color: colors.textMuted,
+    fontSize: 12,
   },
 });
