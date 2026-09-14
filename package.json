@@ -14,6 +14,7 @@
     "expo-splash-screen": "~57.0.8",
     "expo-sqlite": "*",
     "expo-status-bar": "~57.0.1",
+    "expo-updates": "*",
     "expo-web-browser": "~57.0.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",

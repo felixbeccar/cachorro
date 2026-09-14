@@ -8,6 +8,12 @@ module.exports = {
     icon: './assets/images/icon.png',
     scheme: 'cachorro',
     userInterfaceStyle: 'dark',
+    runtimeVersion: {
+      policy: 'fingerprint',
+    },
+    updates: {
+      url: 'https://u.expo.dev/e3ee72a0-0029-483c-b983-e2a64c8bb679',
+    },
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.felixbeccar.cachorro',
@@ -44,6 +50,7 @@ module.exports = {
           color: '#22D3EE',
         },
       ],
+      'expo-updates',
       './plugins/withHealthKit',
     ],
     experiments: {

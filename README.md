@@ -36,7 +36,17 @@ eas build --profile preview --platform ios # builds in the cloud, ~15-20 min
 
 First run, `eas build` will walk you through logging into your Apple ID and registering your iPhone (it handles certificates/provisioning for you — pick the default/"let Expo handle it" options). When the build finishes it prints a link: open it on your iPhone in Safari and tap **Install**. From then on it's a normal app icon — no dev server, no computer needed, and the Activity tab can request Apple Health access since this is a real native build.
 
-To update the app later after making changes, just re-run the `eas build` command above and reinstall from the new link.
+### Updating after that first install
+
+Most changes to this app are JS/TS only (new exercises, screen tweaks, bug fixes in `.ts`/`.tsx` files) — those ship **over the air**, no reinstall:
+
+```bash
+eas update --branch preview --message "what changed"
+```
+
+The app checks for an update on launch and applies it automatically (or on the next launch after that) — usually live within a minute or two, no App Store-style download/install step.
+
+A full rebuild (`eas build --profile preview --platform ios` + reinstalling from the link) is only needed when something **native** changes — a new native library gets added (like `react-native-health` or `expo-notifications`), an iOS permission/entitlement changes, or the Expo SDK version is upgraded. `runtimeVersion` is set to the `fingerprint` policy, which tracks this automatically: if you publish a JS update whose native fingerprint doesn't match what's installed on the phone, the app just won't pick it up (rather than crashing), so `eas update` is always the safe thing to try first — worst case it's a no-op and you fall back to a full build.
 
 ## Enabling Apple Health (Activity tab)
 
