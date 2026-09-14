@@ -17,13 +17,27 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-const REMINDER_HOUR = 19;
-const REMINDER_MINUTE = 0;
+const DEFAULT_REMINDER_TIME = { hour: 19, minute: 0 };
+
+const REMINDER_PRESETS = [
+  { hour: 7, minute: 0 },
+  { hour: 8, minute: 0 },
+  { hour: 12, minute: 0 },
+  { hour: 18, minute: 0 },
+  { hour: 19, minute: 0 },
+  { hour: 20, minute: 0 },
+  { hour: 21, minute: 0 },
+];
+
+function formatTime(hour: number, minute: number) {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
 
 export default function StretchScreen() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [streak, setStreak] = useState(0);
   const [reminderOn, setReminderOn] = useState(false);
+  const [reminderTime, setReminderTime] = useState(DEFAULT_REMINDER_TIME);
 
   useFocusEffect(
     useCallback(() => {
@@ -34,7 +48,10 @@ export default function StretchScreen() {
         setChecked(all);
       }
       setStreak(getStretchStreak());
-      getStretchReminderTime().then((t) => setReminderOn(!!t));
+      getStretchReminderTime().then((t) => {
+        setReminderOn(!!t);
+        if (t) setReminderTime(t);
+      });
     }, [])
   );
 
@@ -57,11 +74,18 @@ export default function StretchScreen() {
         Alert.alert('Notifications disabled', 'Enable notifications in Settings to get a daily reminder.');
         return;
       }
-      await scheduleDailyStretchReminder(REMINDER_HOUR, REMINDER_MINUTE);
+      await scheduleDailyStretchReminder(reminderTime.hour, reminderTime.minute);
       setReminderOn(true);
     } else {
       await cancelDailyStretchReminder();
       setReminderOn(false);
+    }
+  }
+
+  async function handleSelectTime(time: { hour: number; minute: number }) {
+    setReminderTime(time);
+    if (reminderOn) {
+      await scheduleDailyStretchReminder(time.hour, time.minute);
     }
   }
 
@@ -79,17 +103,35 @@ export default function StretchScreen() {
       </View>
 
       <View style={styles.reminderCard}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.reminderTitle}>Daily reminder</Text>
-          <Text style={styles.reminderSubtitle}>
-            {reminderOn ? `Every day at ${String(REMINDER_HOUR).padStart(2, '0')}:00` : 'Off'}
-          </Text>
+        <View style={styles.reminderTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.reminderTitle}>Daily reminder</Text>
+            <Text style={styles.reminderSubtitle}>
+              {reminderOn ? `Every day at ${formatTime(reminderTime.hour, reminderTime.minute)}` : 'Off'}
+            </Text>
+          </View>
+          <Switch
+            value={reminderOn}
+            onValueChange={handleReminderToggle}
+            trackColor={{ true: colors.primary, false: colors.border }}
+          />
         </View>
-        <Switch
-          value={reminderOn}
-          onValueChange={handleReminderToggle}
-          trackColor={{ true: colors.primary, false: colors.border }}
-        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeRow}>
+          {REMINDER_PRESETS.map((time) => {
+            const active = time.hour === reminderTime.hour && time.minute === reminderTime.minute;
+            return (
+              <Pressable
+                key={formatTime(time.hour, time.minute)}
+                onPress={() => handleSelectTime(time)}
+                style={[styles.timeChip, active && styles.timeChipActive]}
+              >
+                <Text style={[styles.timeChipText, active && styles.timeChipTextActive]}>
+                  {formatTime(time.hour, time.minute)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {STRETCHES.map((stretch) => {
@@ -158,14 +200,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   reminderCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: colors.card,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
     marginBottom: spacing.lg,
+  },
+  reminderTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   reminderTitle: {
     color: colors.text,
@@ -176,6 +220,29 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     marginTop: 2,
+  },
+  timeRow: {
+    marginTop: spacing.md,
+  },
+  timeChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginRight: spacing.sm,
+  },
+  timeChipActive: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primary,
+  },
+  timeChipText: {
+    color: colors.textMuted,
+    fontSize: 13,
+  },
+  timeChipTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
   },
   row: {
     flexDirection: 'row',

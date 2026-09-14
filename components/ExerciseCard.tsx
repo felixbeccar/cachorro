@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing } from '../src/theme';
 import { Exercise, SetEntry } from '../src/types';
 import { MuscleBadge } from './MuscleBadge';
+import { RestTimer } from './RestTimer';
 
 interface Props {
   exercise: Exercise;
@@ -119,6 +120,8 @@ export function ExerciseCard({
               <Text style={[styles.footerButtonText, { color: colors.textMuted }]}>Change exercise</Text>
             </Pressable>
           </View>
+
+          <RestTimer />
         </View>
       )}
     </View>

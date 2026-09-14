@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
 import { ProgressChart } from '../../components/ProgressChart';
 import { getExerciseById } from '../../src/data/exercises';
 import {
+  deleteSession,
   getExerciseHistory,
   getLoggedExerciseIds,
   getSessionDetail,
@@ -52,6 +54,26 @@ export default function ProgressScreen() {
     return weights.length ? Math.max(...weights) : null;
   }, [history]);
 
+  function handleDeleteSession(sessionId: number) {
+    Alert.alert('Delete session?', "This removes the workout and all its logged sets. Can't be undone.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deleteSession(sessionId);
+          setSessions(listSessions());
+          setExpandedSessionId((prev) => (prev === sessionId ? null : prev));
+          const ids = getLoggedExerciseIds();
+          setExerciseIds(ids);
+          const nextSelected = selectedExerciseId && ids.includes(selectedExerciseId) ? selectedExerciseId : ids[0] ?? null;
+          setSelectedExerciseId(nextSelected);
+          setHistory(nextSelected ? getExerciseHistory(nextSelected) : []);
+        },
+      },
+    ]);
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.sectionTitle}>Exercise trend</Text>
@@ -95,14 +117,20 @@ export default function ProgressScreen() {
         sessions.map((session) => {
           const expanded = expandedSessionId === session.id;
           return (
-            <Pressable
-              key={session.id}
-              style={styles.sessionCard}
-              onPress={() => setExpandedSessionId(expanded ? null : session.id)}
-            >
-              <Text style={styles.sessionDate}>{formatDate(session.date)}</Text>
+            <View key={session.id} style={styles.sessionCard}>
+              <View style={styles.sessionHeaderRow}>
+                <Pressable
+                  style={{ flex: 1 }}
+                  onPress={() => setExpandedSessionId(expanded ? null : session.id)}
+                >
+                  <Text style={styles.sessionDate}>{formatDate(session.date)}</Text>
+                </Pressable>
+                <Pressable hitSlop={10} onPress={() => handleDeleteSession(session.id)}>
+                  <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
+                </Pressable>
+              </View>
               {expanded && <SessionDetail sessionId={session.id} />}
-            </Pressable>
+            </View>
           );
         })
       )}
@@ -205,6 +233,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.md,
     marginBottom: spacing.sm,
+  },
+  sessionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sessionDate: {
     color: colors.text,

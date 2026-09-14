@@ -97,6 +97,19 @@ export function getSessionDetail(sessionId: number): SessionExerciseDetail[] {
   });
 }
 
+export function deleteSession(sessionId: number) {
+  getDb().withTransactionSync(() => {
+    getDb().runSync(
+      `DELETE FROM sets WHERE session_exercise_id IN (
+         SELECT id FROM session_exercises WHERE session_id = ?
+       )`,
+      [sessionId]
+    );
+    getDb().runSync('DELETE FROM session_exercises WHERE session_id = ?', [sessionId]);
+    getDb().runSync('DELETE FROM sessions WHERE id = ?', [sessionId]);
+  });
+}
+
 export function getExerciseHistory(exerciseId: string): ExerciseHistoryPoint[] {
   const rows = getDb().getAllSync<{ date: string; max_weight_kg: number | null; total_reps: number }>(
     `
