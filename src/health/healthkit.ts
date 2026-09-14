@@ -10,23 +10,31 @@ export interface HealthWorkout {
   distanceKm: number | null;
 }
 
-// react-native-health ships native iOS code that only exists once this app has been
-// prebuilt/rebuilt with a dev client (it is NOT available in plain Expo Go). Requiring it
-// is guarded so the rest of the app keeps working when that native module isn't linked.
-let AppleHealthKit: any = null;
+// react-native-health's own index.js wraps the native module with
+// `Object.assign({}, NativeModules.AppleHealthKit, { Constants: {...} })`. Under React Native's
+// New Architecture, the native module object isn't a plain enumerable object, so Object.assign
+// copies zero of its methods — the wrapper object exists (so a naive "!= null" check passes) but
+// every function on it, like initHealthKit, comes back undefined. Talking to the native module
+// directly (and pulling Permissions from the library's constants submodule) sidesteps that
+// broken wrapper entirely. Also guarded so the rest of the app keeps working when HealthKit isn't
+// linked at all (Expo Go, Android).
+let AppleHealthKitNative: any = null;
+let Permissions: any = null;
 if (Platform.OS === 'ios') {
   try {
-    // react-native-health does `module.exports = HealthKit` (plain CommonJS, no ESM default
-    // wrapper) — requiring `.default` here silently resolved to undefined and made the app
-    // think HealthKit was never linked, even in a real native build.
-    AppleHealthKit = require('react-native-health');
+    AppleHealthKitNative = NativeModules.AppleHealthKit;
+    Permissions = require('react-native-health/src/constants').Permissions;
   } catch {
-    AppleHealthKit = null;
+    AppleHealthKitNative = null;
   }
 }
 
 export function isHealthKitLinked(): boolean {
-  return Platform.OS === 'ios' && AppleHealthKit != null && NativeModules.AppleHealthKit != null;
+  return (
+    Platform.OS === 'ios' &&
+    AppleHealthKitNative != null &&
+    typeof AppleHealthKitNative.initHealthKit === 'function'
+  );
 }
 
 export function initHealthKit(): Promise<void> {
@@ -35,7 +43,6 @@ export function initHealthKit(): Promise<void> {
       reject(new Error('HealthKit is only available in an iOS dev client build, not Expo Go.'));
       return;
     }
-    const Permissions = AppleHealthKit.Constants.Permissions;
     const options = {
       permissions: {
         read: [
@@ -47,7 +54,7 @@ export function initHealthKit(): Promise<void> {
         write: [],
       },
     };
-    AppleHealthKit.initHealthKit(options, (error: string) => {
+    AppleHealthKitNative.initHealthKit(options, (error: string) => {
       if (error) reject(new Error(error));
       else resolve();
     });
@@ -65,7 +72,7 @@ export function fetchRecentWorkouts(days = 30): Promise<HealthWorkout[]> {
       endDate: new Date().toISOString(),
       type: 'Workout',
     };
-    AppleHealthKit.getAnchoredWorkouts(options, (error: string, results: { data: any[] }) => {
+    AppleHealthKitNative.getAnchoredWorkouts(options, (error: string, results: { data: any[] }) => {
       if (error) {
         reject(new Error(error));
         return;
