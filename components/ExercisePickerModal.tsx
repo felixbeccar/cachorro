@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { EXERCISES } from '../src/data/exercises';
+import { EXERCISE_IMAGES } from '../src/data/exerciseImages';
 import { colors, radius, spacing } from '../src/theme';
 import { Exercise, MUSCLE_GROUPS, MUSCLE_GROUP_LABEL } from '../src/types';
 import { MuscleBadge } from './MuscleBadge';
@@ -65,6 +66,9 @@ export function ExercisePickerModal({ visible, excludeIds, onSelect, onClose }: 
                       handleClose();
                     }}
                   >
+                    {EXERCISE_IMAGES[exercise.id] && (
+                      <Image source={EXERCISE_IMAGES[exercise.id][0]} style={styles.rowThumb} />
+                    )}
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.rowName, alreadyAdded && styles.rowNameMuted]}>{exercise.name}</Text>
                       <View style={styles.badgeRow}>
@@ -145,6 +149,13 @@ const styles = StyleSheet.create({
   },
   rowDisabled: {
     opacity: 0.5,
+  },
+  rowThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.sm,
+    marginRight: spacing.md,
+    backgroundColor: colors.cardAlt,
   },
   rowName: {
     color: colors.text,

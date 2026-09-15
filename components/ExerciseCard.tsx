@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, radius, spacing } from '../src/theme';
+import { EXERCISE_IMAGES } from '../src/data/exerciseImages';
 import { EFFORT_LABEL, EffortLevel, Exercise, PreviousExerciseLog, SetEntry } from '../src/types';
 import { MuscleBadge } from './MuscleBadge';
 import { RestTimer } from './RestTimer';
@@ -62,6 +63,8 @@ export function ExerciseCard({
   onSetEffort,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
+  const [frame, setFrame] = useState<0 | 1>(0);
+  const demoImages = EXERCISE_IMAGES[exercise.id];
 
   return (
     <View style={[styles.card, done && styles.cardDone]}>
@@ -112,6 +115,15 @@ export function ExerciseCard({
 
       {expanded && (
         <View style={styles.body}>
+          {demoImages && (
+            <Pressable onPress={() => setFrame((f) => (f === 0 ? 1 : 0))} style={styles.demoWrap}>
+              <Image source={demoImages[frame]} style={styles.demoImage} resizeMode="cover" />
+              <View style={styles.demoHint}>
+                <Ionicons name="sync-outline" size={12} color={colors.text} />
+                <Text style={styles.demoHintText}>tap to see {frame === 0 ? 'finish' : 'start'}</Text>
+              </View>
+            </Pressable>
+          )}
           <View style={styles.setHeaderRow}>
             <Text style={[styles.setHeaderCell, { flex: 0.6 }]}>Set</Text>
             <Text style={styles.setHeaderCell}>Weight (kg)</Text>
@@ -247,6 +259,33 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
+  },
+  demoWrap: {
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
+    backgroundColor: colors.cardAlt,
+  },
+  demoImage: {
+    width: '100%',
+    aspectRatio: 850 / 567,
+  },
+  demoHint: {
+    position: 'absolute',
+    right: spacing.sm,
+    bottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+  },
+  demoHintText: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '600',
   },
   setHeaderRow: {
     flexDirection: 'row',

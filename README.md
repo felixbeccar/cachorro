@@ -7,7 +7,7 @@ Everything is stored locally on your phone (SQLite) — no backend, no account, 
 ## Features
 
 - **Today tab** — a Workout/Stretch switch at the top.
-  - **Workout mode**: generates a ~45 min routine covering every major muscle group (chest, back, shoulders, legs, glutes, core, arms). It favors exercises you haven't done, or haven't done in a while, over ones you keep repeating, and avoids exactly repeating last session's picks. Tap the checkmark to mark an exercise done, log weight/reps per set + an effort rating, see how it went last time, swap/add/remove/reorder exercises, or regenerate the whole routine. Each exercise has a rest timer. **Log by voice**: describe what you did (typed, or dictated via your keyboard's mic button) — "Bulgarian split squat, 3 sets of 12 at 15 kilos" — and it's parsed into the right exercise + sets, with a review step before anything's applied. Needs an Anthropic API key (see below).
+  - **Workout mode**: generates a ~45 min routine covering every major muscle group (chest, back, shoulders, legs, glutes, core, arms). It favors exercises you haven't done, or haven't done in a while, over ones you keep repeating, and avoids exactly repeating last session's picks. Tap the checkmark to mark an exercise done, log weight/reps per set + an effort rating, see how it went last time, swap/add/remove/reorder exercises, or regenerate the whole routine. Each exercise card shows a demo photo (tap it to toggle start/finish position) when one's available. Each exercise has a rest timer. **Log by voice**: describe what you did (typed, or dictated via your keyboard's mic button) — "Bulgarian split squat, 3 sets of 12 at 15 kilos" — and it's parsed into the right exercise + sets, with a review step before anything's applied. Needs an Anthropic API key (see below).
   - **Stretch mode**: a ~15 minute daily stretching routine as a checklist, a streak counter, and an optional daily local reminder notification.
 - **Plan tab** — a real weekly schedule (which days are Gym/Padel/Pilates/Rest, tap a day to cycle), a front/back body diagram showing which muscles you worked last session vs. what's coming up next, and a persisted, editable session timeline (with duration estimates and suggested weights) for each upcoming gym day. Edits here carry over: swap/add/remove/reorder an exercise for Wednesday, and Wednesday's Today tab shows that when it arrives.
 - **Progress tab** — a dashboard: sessions/volume in the last 30 days, a weekly training streak, a muscle-group balance chart (are you neglecting legs?), a weight-over-time trend and personal best per exercise, and full session history (deletable).
@@ -86,6 +86,10 @@ See `src/logic/routineGenerator.ts`. For each muscle group it scores every exerc
 - Otherwise, score = days since last done, minus a small penalty per time already done.
 
 That means brand-new exercises get suggested first, exercises you haven't touched in a while come next, and exercises you do constantly get deprioritized (but can still show up — nothing is ever fully excluded). It also avoids exactly repeating the exercises from your last finished session. Add more exercises any time by extending `EXERCISES` in `src/data/exercises.ts` — no other code needs to change.
+
+### Exercise demo photos
+
+Most exercises show a start/finish demo photo (`src/data/exerciseImages.ts` maps exercise id → two `require()`d JPGs in `assets/exercises/`), sourced from [free-exercise-db](https://github.com/yuhonas/free-exercise-db), a public-domain (Unlicense) exercise dataset — no scraping, no licensing risk. A few exercises with no close match in that dataset (e.g. `high-plank-arm-reach`, `seated-windshield-wipers`) just don't have a photo yet. To add one: drop `<id>-0.jpg` and `<id>-1.jpg` (~480px wide) into `assets/exercises/` and add a line to `EXERCISE_IMAGES`.
 
 ## Data model
 
