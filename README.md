@@ -7,7 +7,7 @@ Everything is stored locally on your phone (SQLite) — no backend, no account, 
 ## Features
 
 - **Today tab** — a Workout/Stretch switch at the top.
-  - **Workout mode**: generates a ~45 min routine covering every major muscle group (chest, back, shoulders, legs, glutes, core, arms). It favors exercises you haven't done, or haven't done in a while, over ones you keep repeating, and avoids exactly repeating last session's picks. Tap the checkmark to mark an exercise done, log weight/reps per set + an effort rating, see how it went last time, swap/add/remove/reorder exercises, or regenerate the whole routine. Each exercise has a rest timer.
+  - **Workout mode**: generates a ~45 min routine covering every major muscle group (chest, back, shoulders, legs, glutes, core, arms). It favors exercises you haven't done, or haven't done in a while, over ones you keep repeating, and avoids exactly repeating last session's picks. Tap the checkmark to mark an exercise done, log weight/reps per set + an effort rating, see how it went last time, swap/add/remove/reorder exercises, or regenerate the whole routine. Each exercise has a rest timer. **Log by voice**: describe what you did (typed, or dictated via your keyboard's mic button) — "Bulgarian split squat, 3 sets of 12 at 15 kilos" — and it's parsed into the right exercise + sets, with a review step before anything's applied. Needs an Anthropic API key (see below).
   - **Stretch mode**: a ~15 minute daily stretching routine as a checklist, a streak counter, and an optional daily local reminder notification.
 - **Plan tab** — a real weekly schedule (which days are Gym/Padel/Pilates/Rest, tap a day to cycle), a front/back body diagram showing which muscles you worked last session vs. what's coming up next, and a persisted, editable session timeline (with duration estimates and suggested weights) for each upcoming gym day. Edits here carry over: swap/add/remove/reorder an exercise for Wednesday, and Wednesday's Today tab shows that when it arrives.
 - **Progress tab** — a dashboard: sessions/volume in the last 30 days, a weekly training streak, a muscle-group balance chart (are you neglecting legs?), a weight-over-time trend and personal best per exercise, and full session history (deletable).
@@ -69,6 +69,15 @@ Install the resulting build on your phone via the link EAS gives you, then run `
 
 Padel isn't a built-in Apple Health workout type — whatever type your padel-tracking app (Playtomic, Apple Fitness, etc.) logs it as will show up here, since the Activity tab reads *all* recorded workouts, not a fixed whitelist.
 
+## Enabling voice logging (Workout mode)
+
+Tap **Log by voice** on the Today tab. The first time, it'll ask for an Anthropic API key:
+
+1. Get one at [console.anthropic.com](https://console.anthropic.com) (requires setting up billing — this feature costs a small fraction of a cent per use, on the `claude-haiku-4-5` model).
+2. Paste it in when prompted. It's stored only on your phone, in the iOS Keychain via `expo-secure-store` — never synced anywhere, never leaves the device except in the API call itself.
+
+How it works: type or dictate (tap the mic icon on your keyboard) a description of what you did — "Bulgarian split squat, 3 sets of 12 at 15 kilos each leg" — tap Parse, and it sends that text (plus your exercise catalog, so it can match names) to Claude, which returns structured sets per exercise. You get a review screen to fix any misheard numbers or pick the right exercise if it couldn't match one, before anything is applied to today's session. Nothing is auto-saved without that confirmation step.
+
 ## How the routine generator works
 
 See `src/logic/routineGenerator.ts`. For each muscle group it scores every exercise in `src/data/exercises.ts`:
@@ -95,11 +104,12 @@ There's no server and no export yet — data lives on-device. If you want a back
 app/(tabs)/        expo-router screens: index (Today shell), plan, progress, activity
 components/        WorkoutMode, StretchMode, ExerciseCard, ExercisePickerModal, RestTimer,
                    ProgressChart, MuscleBalanceChart, MuscleBadge, BodyDiagram,
-                   SessionTimeline, WeeklyScheduleEditor
+                   SessionTimeline, WeeklyScheduleEditor, VoiceLogModal
 src/data/          exercise library, stretch routine
 src/db/            SQLite schema + queries
 src/logic/         routine generator, weekly schedule helpers, session-duration estimates,
                    dashboard stats (streaks, muscle balance)
+src/ai/            voice-log text parsing (Claude API) + secure API key storage
 src/health/        HealthKit wrapper (guarded so it's a no-op outside a dev-client build)
 src/notifications/ daily stretch reminder scheduling
 plugins/           local Expo config plugin adding the HealthKit entitlement

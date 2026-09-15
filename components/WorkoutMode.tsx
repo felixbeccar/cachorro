@@ -5,6 +5,7 @@ import { useFocusEffect } from 'expo-router';
 
 import { ExerciseCard } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
+import { VoiceLogModal } from './VoiceLogModal';
 import { getExerciseById } from '../src/data/exercises';
 import {
   addSessionExercise,
@@ -45,6 +46,7 @@ export function WorkoutMode() {
   const [loaded, setLoaded] = useState(false);
   // 'add' appends a new exercise; a number replaces the exercise at that index in `routine`.
   const [pickerTarget, setPickerTarget] = useState<'add' | number | null>(null);
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
 
   const buildRoutine = useCallback((freshStats: Record<string, ExerciseStat>) => {
     const planned = getPlannedSession(todayISO());
@@ -195,6 +197,28 @@ export function WorkoutMode() {
     setEffortByExercise((prev) => ({ ...prev, [exerciseId]: prev[exerciseId] === effort ? null : effort }));
   }
 
+  function handleApplyVoiceLog(entries: { exercise: Exercise; sets: { weightKg: number | null; reps: number | null }[] }[]) {
+    const existingIds = new Set(routine.map((p) => p.exercise.id));
+    const additions: RoutinePick[] = [];
+    for (const entry of entries) {
+      if (!existingIds.has(entry.exercise.id)) {
+        const isNew = !stats[entry.exercise.id] || stats[entry.exercise.id].timesDone === 0;
+        additions.push({ exercise: entry.exercise, isNew, group: entry.exercise.muscleGroups[0] });
+        existingIds.add(entry.exercise.id);
+      }
+    }
+    if (additions.length > 0) {
+      setRoutine((prev) => [...prev, ...additions]);
+    }
+    setSetsByExercise((prev) => {
+      const next = { ...prev };
+      for (const entry of entries) {
+        next[entry.exercise.id] = entry.sets.map((s, i) => ({ setIndex: i, weightKg: s.weightKg, reps: s.reps }));
+      }
+      return next;
+    });
+  }
+
   function handleMove(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= routine.length) return;
@@ -286,6 +310,11 @@ export function WorkoutMode() {
         <Text style={styles.addExerciseButtonText}>Add exercise</Text>
       </Pressable>
 
+      <Pressable style={styles.addExerciseButton} onPress={() => setVoiceModalVisible(true)}>
+        <Ionicons name="mic-outline" size={18} color={colors.primary} />
+        <Text style={styles.addExerciseButtonText}>Log by voice</Text>
+      </Pressable>
+
       <Pressable style={styles.primaryButton} onPress={handleFinish}>
         <Text style={styles.primaryButtonText}>Finish workout</Text>
       </Pressable>
@@ -295,6 +324,12 @@ export function WorkoutMode() {
         excludeIds={routine.map((p) => p.exercise.id)}
         onSelect={handleSelectFromPicker}
         onClose={() => setPickerTarget(null)}
+      />
+
+      <VoiceLogModal
+        visible={voiceModalVisible}
+        onClose={() => setVoiceModalVisible(false)}
+        onApply={handleApplyVoiceLog}
       />
     </ScrollView>
   );

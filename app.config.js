@@ -51,6 +51,7 @@ module.exports = {
         },
       ],
       'expo-updates',
+      'expo-secure-store',
       './plugins/withHealthKit',
     ],
     experiments: {
