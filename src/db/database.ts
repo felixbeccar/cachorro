@@ -71,14 +71,14 @@ export function initDatabase() {
     // Column already exists.
   }
 
-  // Seed the weekly schedule once: gym Mon/Wed, padel Tue, pilates Fri, rest otherwise.
+  // Seed the weekly schedule once: gym Mon/Wed, padel Tue/Sun, pilates Fri, rest otherwise.
   const scheduleCount = database.getFirstSync<{ count: number }>(
     'SELECT COUNT(*) as count FROM weekly_schedule'
   );
   if (!scheduleCount || scheduleCount.count === 0) {
     // day_of_week: 0 = Sunday ... 6 = Saturday (matches JS Date#getDay()).
     const defaults: [number, string][] = [
-      [0, 'rest'],
+      [0, 'padel'],
       [1, 'gym'],
       [2, 'padel'],
       [3, 'gym'],
