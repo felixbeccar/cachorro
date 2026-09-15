@@ -21,7 +21,7 @@ module.exports = {
     android: {
       package: 'com.felixbeccar.cachorro',
       adaptiveIcon: {
-        backgroundColor: '#0B0F14',
+        backgroundColor: '#0B0F0D',
         foregroundImage: './assets/images/android-icon-foreground.png',
         backgroundImage: './assets/images/android-icon-background.png',
         monochromeImage: './assets/images/android-icon-monochrome.png',
@@ -40,14 +40,14 @@ module.exports = {
         {
           image: './assets/images/splash-icon.png',
           resizeMode: 'contain',
-          backgroundColor: '#0B0F14',
+          backgroundColor: '#0B0F0D',
         },
       ],
       [
         'expo-notifications',
         {
           icon: './assets/images/icon.png',
-          color: '#22D3EE',
+          color: '#4FB88A',
         },
       ],
       'expo-updates',
