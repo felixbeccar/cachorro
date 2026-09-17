@@ -53,6 +53,9 @@ export function WorkoutMode() {
   const [pickerTarget, setPickerTarget] = useState<'add' | number | null>(null);
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [pendingVoiceText, setPendingVoiceText] = useState<string | undefined>(undefined);
+  // True while any card is being dragged — collapses every card (see ExerciseCard's
+  // listDragging prop) so reordering isn't autoscrolling through full-height cards.
+  const [isDragging, setIsDragging] = useState(false);
 
   const buildRoutine = useCallback((freshStats: Record<string, ExerciseStat>) => {
     const planned = getPlannedSession(todayISO());
@@ -240,6 +243,7 @@ export function WorkoutMode() {
 
   function handleDragEnd(data: RoutinePick[]) {
     setRoutine(data);
+    setIsDragging(false);
   }
 
   const sessionEffort = useMemo(
@@ -284,8 +288,12 @@ export function WorkoutMode() {
         onChangeExercise={() => setPickerTarget(i)}
         onRemove={() => handleRemoveExercise(i)}
         onSetEffort={(effort) => handleSetEffort(pick.exercise.id, effort)}
-        onDragStart={drag}
+        onDragStart={() => {
+          setIsDragging(true);
+          drag();
+        }}
         dragActive={isActive}
+        listDragging={isDragging}
       />
     );
   }
@@ -297,7 +305,10 @@ export function WorkoutMode() {
         data={routine}
         keyExtractor={(pick) => pick.exercise.id}
         renderItem={renderExercise}
+        onDragBegin={() => setIsDragging(true)}
         onDragEnd={({ data }) => handleDragEnd(data)}
+        autoscrollSpeed={150}
+        autoscrollThreshold={80}
         ListHeaderComponent={
           <>
             <View style={styles.headerRow}>

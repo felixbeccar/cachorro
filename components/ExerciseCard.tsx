@@ -42,6 +42,9 @@ interface Props {
   /** Long-press the drag handle to start reordering (from the enclosing DraggableFlatList). */
   onDragStart?: () => void;
   dragActive?: boolean;
+  /** True while any card in the list is being dragged — collapses every card so reordering
+   * doesn't mean auto-scrolling through full-height photos/set tables to find a drop spot. */
+  listDragging?: boolean;
 }
 
 export function ExerciseCard({
@@ -59,14 +62,16 @@ export function ExerciseCard({
   onSetEffort,
   onDragStart,
   dragActive,
+  listDragging,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [frame, setFrame] = useState<0 | 1>(0);
   const demoImages = EXERCISE_IMAGES[exercise.id];
+  const showBody = expanded && !listDragging;
 
   return (
     <View style={[styles.card, done && styles.cardDone, dragActive && styles.cardDragging]}>
-      <Pressable style={styles.header} onPress={() => setExpanded((e) => !e)}>
+      <Pressable style={styles.header} onPress={() => !listDragging && setExpanded((e) => !e)}>
         {onDragStart && (
           <Pressable
             hitSlop={12}
@@ -87,34 +92,42 @@ export function ExerciseCard({
               </View>
             )}
           </View>
-          <View style={styles.badgeRow}>
-            {exercise.muscleGroups.map((g) => (
-              <MuscleBadge key={g} group={g} />
-            ))}
-          </View>
-          <Text style={styles.meta}>
-            {exercise.equipment} · Target {exercise.defaultSets} x {exercise.defaultReps}
-          </Text>
-          {previousLog && (
-            <Text style={styles.previousText}>
-              Previous: {formatShortDate(previousLog.date)} · {summarizePreviousSets(previousLog.sets)}
-              {previousLog.effort ? ` · Effort: ${EFFORT_LABEL[previousLog.effort]}` : ''}
-            </Text>
+          {!listDragging && (
+            <>
+              <View style={styles.badgeRow}>
+                {exercise.muscleGroups.map((g) => (
+                  <MuscleBadge key={g} group={g} />
+                ))}
+              </View>
+              <Text style={styles.meta}>
+                {exercise.equipment} · Target {exercise.defaultSets} x {exercise.defaultReps}
+              </Text>
+              {previousLog && (
+                <Text style={styles.previousText}>
+                  Previous: {formatShortDate(previousLog.date)} · {summarizePreviousSets(previousLog.sets)}
+                  {previousLog.effort ? ` · Effort: ${EFFORT_LABEL[previousLog.effort]}` : ''}
+                </Text>
+              )}
+            </>
           )}
         </View>
-        <Pressable hitSlop={10} onPress={onRemove} style={styles.removeButton}>
-          <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
-        </Pressable>
-        <Pressable hitSlop={10} onPress={onToggleDone} style={styles.checkbox}>
-          <Ionicons
-            name={done ? 'checkmark-circle' : 'ellipse-outline'}
-            size={28}
-            color={done ? colors.success : colors.textMuted}
-          />
-        </Pressable>
+        {!listDragging && (
+          <>
+            <Pressable hitSlop={10} onPress={onRemove} style={styles.removeButton}>
+              <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
+            </Pressable>
+            <Pressable hitSlop={10} onPress={onToggleDone} style={styles.checkbox}>
+              <Ionicons
+                name={done ? 'checkmark-circle' : 'ellipse-outline'}
+                size={28}
+                color={done ? colors.success : colors.textMuted}
+              />
+            </Pressable>
+          </>
+        )}
       </Pressable>
 
-      {expanded && (
+      {showBody && (
         <View style={styles.body}>
           {demoImages && (
             <Pressable onPress={() => setFrame((f) => (f === 0 ? 1 : 0))} style={styles.demoWrap}>
