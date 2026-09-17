@@ -1,5 +1,5 @@
 import { EXERCISES } from '../data/exercises';
-import { ExerciseStat, MUSCLE_GROUPS, RoutinePick } from '../types';
+import { ExerciseStat, MUSCLE_GROUPS, MuscleGroup, RoutinePick } from '../types';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -17,22 +17,30 @@ function noveltyScore(exerciseId: string, stats: Record<string, ExerciseStat>): 
 }
 
 /**
- * Builds a well-rounded ~45 minute routine: one exercise per major muscle group,
+ * Builds a well-rounded ~40-45 minute routine: one exercise per major muscle group,
  * preferring exercises the user hasn't done, or hasn't done in a while.
  * `excludeIds` lets the caller avoid repeating exercises picked for another group in the same routine
  * (some exercises hit multiple groups) and `avoidIds` (e.g. last session's picks) nudges variety further.
+ * `excludeGroups` drops whole muscle groups from the routine (e.g. a voice command to skip legs).
  */
 export function generateRoutine(
   stats: Record<string, ExerciseStat>,
-  avoidIds: string[] = []
+  avoidIds: string[] = [],
+  excludeGroups: MuscleGroup[] = []
 ): RoutinePick[] {
   const avoidSet = new Set(avoidIds);
+  const excludedGroups = new Set(excludeGroups);
   const usedIds = new Set<string>();
   const picks: RoutinePick[] = [];
 
   for (const group of MUSCLE_GROUPS) {
+    if (excludedGroups.has(group)) continue;
     const candidates = EXERCISES.filter(
-      (e) => e.muscleGroups.includes(group) && !usedIds.has(e.id) && !e.manualOnly
+      (e) =>
+        e.muscleGroups.includes(group) &&
+        !usedIds.has(e.id) &&
+        !e.manualOnly &&
+        !e.muscleGroups.some((g) => excludedGroups.has(g))
     );
     if (candidates.length === 0) continue;
 

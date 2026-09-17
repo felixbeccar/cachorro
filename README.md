@@ -1,17 +1,21 @@
 # cachorro
 
-A simple, personal gym app: a ~45 minute well-rounded workout you can run through twice a week, daily 15-minute stretching with reminders, progress tracking over time, and (on iOS, with a custom build) your Apple Health workouts (padel, walking, etc.) pulled into one activity view.
+A simple, personal gym app: a ~40-45 minute well-rounded workout you can run through twice a week, progress tracking over time, and (on iOS, with a custom build) your Apple Health workouts (padel, walking, etc.) pulled into one activity view.
 
 Everything is stored locally on your phone (SQLite) — no backend, no account, no syncing.
 
 ## Features
 
-- **Today tab** — a Workout/Stretch switch at the top.
-  - **Workout mode**: a session report card up top — a body diagram of what this session hits, estimated duration, and a forecasted effort (from how hard these exercises felt last time) — then generates a ~45 min routine covering every major muscle group (chest, back, shoulders, legs, glutes, core, arms). It favors exercises you haven't done, or haven't done in a while, over ones you keep repeating, and avoids exactly repeating last session's picks. Tap the checkmark to mark an exercise done, log weight/reps per set + an effort rating, see how it went last time, swap/add/remove exercises, or regenerate the whole routine. Long-press the drag handle (⠿) on a card to reorder it, iOS-reorder-style. Each exercise card shows a demo photo (tap it to toggle start/finish position) when one's available. Each exercise has a rest timer. **Log by voice**: describe what you did (typed, or dictated via your keyboard's mic button) — "Bulgarian split squat, 3 sets of 12 at 15 kilos" — and it's parsed into the right exercise + sets, with a review step before anything's applied. Needs an Anthropic API key (see below).
-  - **Stretch mode**: a ~15 minute daily stretching routine as a checklist, a streak counter, and an optional daily local reminder notification.
+- **Today tab** — the live session you use in the gym. A voice command bar and a session report card sit at the top, then the exercise list, in a ~40-45 min routine covering every major muscle group (chest, back, shoulders, legs, glutes, core, arms). It favors exercises you haven't done, or haven't done in a while, over ones you keep repeating, and avoids exactly repeating last session's picks.
+  - **Voice command**: tap the mic and it starts listening immediately (native speech recognition, no typing screen first). Report a set you just did — "Bulgarian split squat, 3 sets of 12 at 15 kilos" — and it's parsed into the right exercise + sets, with a review step before anything's applied. Or reshape the whole session — "I'm wiped, make it light" or "no legs today, my knee hurts" — and it's replanned immediately (lighter sets, or a group dropped from the routine), no confirmation needed. Needs an Anthropic API key and a microphone/speech-recognition permission (see below).
+  - **Session report card**: a body diagram of exactly what *this* session hits, its estimated duration, and a forecasted effort (from how hard these exercises felt last time you logged them).
+  - Tap the checkmark to mark an exercise done, log weight/reps per set + an effort rating, see how it went last time, swap/add/remove exercises, or regenerate the whole routine. Long-press the drag handle (⠿) on a card to reorder it, iOS-reorder-style. Each collapsed card shows its estimated minutes next to the name. Each exercise card shows a demo photo (tap it to toggle start/finish position) when one's available, and a rest timer.
+  - **Finish workout** saves immediately, no confirmation dialog — and the session stays right there, fully editable. Change a set, add an exercise, whatever — the button becomes **Save changes** and every tap just overwrites that same saved session, so there's no dead end and no separate "history" you have to go find to fix a typo.
 - **Plan tab** — a real weekly schedule (which days are Gym/Padel/Pilates/Rest, tap a day to cycle), a front/back body diagram showing which muscles you worked last session vs. what's coming up next, and — for each upcoming gym day — the same session report card as Today (muscles hit, duration, forecasted effort) plus a persisted, editable session timeline (with suggested weights). Edits here carry over: swap/add/remove/reorder (long-press the drag handle) an exercise for Wednesday, and Wednesday's Today tab shows that when it arrives.
 - **Progress tab** — a dashboard: sessions/volume in the last 30 days, a weekly training streak, a muscle-group balance chart (are you neglecting legs?), a weight-over-time trend and personal best per exercise, and full session history (deletable).
 - **Activity tab** (iOS only, requires a dev-client/EAS build — see below) — reads your recent workouts from Apple Health (padel, walking, running, anything logged there) into a simple list.
+
+Daily stretching isn't tracked in-app anymore — do it on your own, no logging needed. (The old stretch checklist/streak/reminder code is still in the repo, just unlinked from the Today tab, in case it's wanted back.)
 
 ## Installing on your iPhone
 
@@ -24,7 +28,7 @@ npm install
 npx expo start
 ```
 
-Install **Expo Go** from the App Store, scan the QR code the command prints. Today / Progress / Stretch all work fully. This needs your computer running `expo start` and both devices on the same network (or a tunnel) every time you open the app — fine for trying it out, not for daily use. No Apple Health (see below for why).
+Install **Expo Go** from the App Store, scan the QR code the command prints. Today and Progress work fully. This needs your computer running `expo start` and both devices on the same network (or a tunnel) every time you open the app — fine for trying it out, not for daily use. No Apple Health, and no voice command (see below for why).
 
 ### Real install — a standalone app icon on your phone, works offline, includes Apple Health
 
@@ -69,14 +73,20 @@ Install the resulting build on your phone via the link EAS gives you, then run `
 
 Padel isn't a built-in Apple Health workout type — whatever type your padel-tracking app (Playtomic, Apple Fitness, etc.) logs it as will show up here, since the Activity tab reads *all* recorded workouts, not a fixed whitelist.
 
-## Enabling voice logging (Workout mode)
+## Enabling the voice command (Workout mode)
 
-Tap **Log by voice** on the Today tab. The first time, it'll ask for an Anthropic API key:
+`expo-speech-recognition` links native speech-recognition code (iOS `SFSpeechRecognizer`), so — like Apple Health — it only works in a real build, not Expo Go: a fresh `eas build --profile preview --platform ios` (or a dev-client build) picks it up, since it's a new native module, not something `eas update` can ship over the air. See "Updating after that first install" above.
+
+Tap the mic bar on the Today tab. First tap, iOS will ask for microphone + speech-recognition permission; grant both. It also needs an Anthropic API key, same as before:
 
 1. Get one at [console.anthropic.com](https://console.anthropic.com) (requires setting up billing — this feature costs a small fraction of a cent per use, on the `claude-haiku-4-5` model).
 2. Paste it in when prompted. It's stored only on your phone, in the iOS Keychain via `expo-secure-store` — never synced anywhere, never leaves the device except in the API call itself.
 
-How it works: type or dictate (tap the mic icon on your keyboard) a description of what you did — "Bulgarian split squat, 3 sets of 12 at 15 kilos each leg" — tap Parse, and it sends that text (plus your exercise catalog, so it can match names) to Claude, which returns structured sets per exercise. You get a review screen to fix any misheard numbers or pick the right exercise if it couldn't match one, before anything is applied to today's session. Nothing is auto-saved without that confirmation step.
+How it works: tap the mic — it starts listening immediately, no text box first. Say what you did ("Bulgarian split squat, 3 sets of 12 at 15 kilos each leg") or an instruction ("I'm wiped, make it light" / "no legs today, my knee hurts"). The transcript goes to Claude (`src/ai/parseVoiceCommand.ts`), which classifies it and either:
+- returns structured sets per exercise — you get a review screen to fix any misheard numbers or pick the right exercise before it's applied, or
+- returns which muscle groups to drop and/or a new sets-per-exercise count — today's routine is regenerated immediately, no confirmation screen (a quick "✓ &lt;summary&gt;" banner shows what changed).
+
+If mic/speech permission is denied, the bar falls back to a "tap to type a command instead" link that opens the same flow with a text box.
 
 ## How the routine generator works
 
@@ -85,7 +95,7 @@ See `src/logic/routineGenerator.ts`. For each muscle group it scores every exerc
 - Never done before → always wins.
 - Otherwise, score = days since last done, minus a small penalty per time already done.
 
-That means brand-new exercises get suggested first, exercises you haven't touched in a while come next, and exercises you do constantly get deprioritized (but can still show up — nothing is ever fully excluded). It also avoids exactly repeating the exercises from your last finished session. Add more exercises any time by extending `EXERCISES` in `src/data/exercises.ts` — no other code needs to change.
+That means brand-new exercises get suggested first, exercises you haven't touched in a while come next, and exercises you do constantly get deprioritized (but can still show up — nothing is ever fully excluded, unless you explicitly ask by voice to skip a muscle group for the day). It also avoids exactly repeating the exercises from your last finished session. Add more exercises any time by extending `EXERCISES` in `src/data/exercises.ts` — no other code needs to change.
 
 ### Exercise demo photos
 
@@ -95,10 +105,12 @@ Most exercises show a start/finish demo photo (`src/data/exerciseImages.ts` maps
 
 Everything lives in a local SQLite database (`expo-sqlite`, see `src/db/`):
 
-- `sessions` — one row per finished workout.
+- `sessions` — one row per saved workout. A session is created on first "Finish workout" and can be
+  re-saved any number of times after — `replaceSessionExercises()` wholesale-replaces its exercises/sets
+  each time, so editing a saved session is just saving it again.
 - `session_exercises` — which exercises were done in a session, and in what order.
 - `sets` — weight/reps per set.
-- `stretch_logs` — one row per day, whether the full stretch routine was completed.
+- `stretch_logs` — unused now that stretching isn't tracked in-app, kept for a possible future revival.
 
 There's no server and no export yet — data lives on-device. If you want a backup/export or iCloud sync later, that's the natural next feature to add.
 
@@ -106,20 +118,20 @@ There's no server and no export yet — data lives on-device. If you want a back
 
 ```
 app/(tabs)/        expo-router screens: index (Today shell), plan, progress, activity
-components/        WorkoutMode, StretchMode, ExerciseCard, ExercisePickerModal, RestTimer,
-                   ProgressChart, MuscleBalanceChart, MuscleBadge, BodyDiagram,
-                   SessionTimeline, WeeklyScheduleEditor, VoiceLogModal
-src/data/          exercise library, stretch routine
+components/        WorkoutMode, VoiceCommandBar, VoiceLogModal, SessionReportCard, ExerciseCard,
+                   ExercisePickerModal, RestTimer, ProgressChart, MuscleBalanceChart, MuscleBadge,
+                   BodyDiagram, SessionTimeline, WeeklyScheduleEditor, StretchMode (unused, see above)
+src/data/          exercise library, stretch routine (unused), exercise demo image manifest
 src/db/            SQLite schema + queries
 src/logic/         routine generator, weekly schedule helpers, session-duration estimates,
-                   dashboard stats (streaks, muscle balance)
-src/ai/            voice-log text parsing (Claude API) + secure API key storage
+                   session-effort forecasting, dashboard stats (streaks, muscle balance)
+src/ai/            voice-command parsing (Claude API, log-vs-adjust-routine intent) + secure API key storage
 src/health/        HealthKit wrapper (guarded so it's a no-op outside a dev-client build)
-src/notifications/ daily stretch reminder scheduling
+src/notifications/ daily stretch reminder scheduling (unused, see above)
 plugins/           local Expo config plugin adding the HealthKit entitlement
 patches/           patch-package fix for react-native-health's New Architecture bug
 ```
 
 ## Stack
 
-Expo (React Native, TypeScript) + expo-router + expo-sqlite + expo-notifications + react-native-svg + react-native-health + react-native-draggable-flatlist (reorder gestures, via reanimated + gesture-handler).
+Expo (React Native, TypeScript) + expo-router + expo-sqlite + expo-notifications + react-native-svg + react-native-health + react-native-draggable-flatlist (reorder gestures, via reanimated + gesture-handler) + expo-speech-recognition (native voice command).

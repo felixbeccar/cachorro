@@ -52,6 +52,13 @@ module.exports = {
       ],
       'expo-updates',
       'expo-secure-store',
+      [
+        'expo-speech-recognition',
+        {
+          microphonePermission: 'Cachorro uses the microphone to hear voice commands during your workout.',
+          speechRecognitionPermission: 'Cachorro uses speech recognition to turn what you say into workout updates.',
+        },
+      ],
       './plugins/withHealthKit',
     ],
     experiments: {

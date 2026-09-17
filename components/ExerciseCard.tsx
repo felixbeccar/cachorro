@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { estimateExerciseMinutes } from '../src/logic/timeline';
 import { colors, radius, spacing } from '../src/theme';
 import { EXERCISE_IMAGES } from '../src/data/exerciseImages';
 import { EFFORT_LABEL, EffortLevel, Exercise, PreviousExerciseLog, SetEntry } from '../src/types';
@@ -79,6 +80,7 @@ export function ExerciseCard({
         <View style={{ flex: 1 }}>
           <View style={styles.titleRow}>
             <Text style={styles.name}>{exercise.name}</Text>
+            <Text style={styles.durationPill}>{estimateExerciseMinutes(exercise)}'</Text>
             {isNew && (
               <View style={styles.newPill}>
                 <Text style={styles.newPillText}>NEW</Text>
@@ -231,6 +233,11 @@ const styles = StyleSheet.create({
     color: colors.success,
     fontSize: 10,
     fontWeight: '700',
+  },
+  durationPill: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
   },
   badgeRow: {
     flexDirection: 'row',

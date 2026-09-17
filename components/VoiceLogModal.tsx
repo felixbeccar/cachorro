@@ -14,10 +14,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { clearApiKey, getApiKey, setApiKey as saveApiKey } from '../src/ai/apiKeyStore';
-import { parseWorkoutText } from '../src/ai/parseWorkoutText';
+import { parseVoiceCommand } from '../src/ai/parseVoiceCommand';
 import { getExerciseById } from '../src/data/exercises';
 import { colors, radius, spacing } from '../src/theme';
-import { Exercise } from '../src/types';
+import { Exercise, MuscleGroup } from '../src/types';
 import { ExercisePickerModal } from './ExercisePickerModal';
 
 interface ReviewSet {
@@ -33,8 +33,11 @@ interface ReviewEntry {
 
 interface Props {
   visible: boolean;
+  /** Pre-captured transcript (from the native voice bar) — parses immediately, skipping the typing screen. */
+  initialText?: string;
   onClose: () => void;
-  onApply: (entries: { exercise: Exercise; sets: ReviewSet[] }[]) => void;
+  onApplyLog: (entries: { exercise: Exercise; sets: ReviewSet[] }[]) => void;
+  onAdjustRoutine: (excludeGroups: MuscleGroup[], setsOverride: number | null, summary: string) => void;
 }
 
 function parseNumber(value: string): number | null {
@@ -43,7 +46,7 @@ function parseNumber(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function VoiceLogModal({ visible, onClose, onApply }: Props) {
+export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdjustRoutine }: Props) {
   const [apiKey, setApiKeyState] = useState<string | null>(null);
   const [checkingKey, setCheckingKey] = useState(true);
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -51,7 +54,9 @@ export function VoiceLogModal({ visible, onClose, onApply }: Props) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [reviewEntries, setReviewEntries] = useState<ReviewEntry[] | null>(null);
+  const [adjustSummary, setAdjustSummary] = useState<string | null>(null);
   const [pickerForIndex, setPickerForIndex] = useState<number | null>(null);
+  const [initialTextHandled, setInitialTextHandled] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -62,10 +67,22 @@ export function VoiceLogModal({ visible, onClose, onApply }: Props) {
     });
   }, [visible]);
 
+  // Voice bar handed us a final transcript — parse right away, no typing/Parse tap needed.
+  useEffect(() => {
+    if (visible && initialText && apiKey && !checkingKey && !initialTextHandled) {
+      setInitialTextHandled(true);
+      setText(initialText);
+      handleParse(initialText);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, initialText, apiKey, checkingKey, initialTextHandled]);
+
   function resetAndClose() {
     setText('');
     setReviewEntries(null);
+    setAdjustSummary(null);
     setErrorMessage('');
+    setInitialTextHandled(false);
     onClose();
   }
 
@@ -82,19 +99,27 @@ export function VoiceLogModal({ visible, onClose, onApply }: Props) {
     setErrorMessage('');
   }
 
-  async function handleParse() {
-    if (!apiKey || !text.trim()) return;
+  async function handleParse(spokenText: string) {
+    if (!apiKey || !spokenText.trim()) return;
     setLoading(true);
     setErrorMessage('');
     try {
-      const parsed = await parseWorkoutText(apiKey, text.trim());
-      setReviewEntries(
-        parsed.map((p) => ({
-          exercise: p.exerciseId ? getExerciseById(p.exerciseId) ?? null : null,
-          nameGuess: p.exerciseNameGuess,
-          sets: p.sets.map((s) => ({ weightKg: s.weightKg, reps: s.reps })),
-        }))
-      );
+      const result = await parseVoiceCommand(apiKey, spokenText.trim());
+      if (result.intent === 'log_sets') {
+        setReviewEntries(
+          result.logEntries.map((p) => ({
+            exercise: p.exerciseId ? getExerciseById(p.exerciseId) ?? null : null,
+            nameGuess: p.exerciseNameGuess,
+            sets: p.sets.map((s) => ({ weightKg: s.weightKg, reps: s.reps })),
+          }))
+        );
+      } else if (result.intent === 'adjust_routine') {
+        onAdjustRoutine(result.excludeMuscleGroups as MuscleGroup[], result.setsOverride, result.summary);
+        setAdjustSummary(result.summary || 'Session updated.');
+        setTimeout(resetAndClose, 1800);
+      } else {
+        setErrorMessage(result.summary || "Didn't catch a clear instruction — try again.");
+      }
     } catch (err: any) {
       setErrorMessage(err?.message ?? 'Something went wrong.');
     } finally {
@@ -134,9 +159,12 @@ export function VoiceLogModal({ visible, onClose, onApply }: Props) {
       .filter((e): e is ReviewEntry & { exercise: Exercise } => e.exercise != null)
       .map((e) => ({ exercise: e.exercise, sets: e.sets }));
     if (resolved.length === 0) return;
-    onApply(resolved);
+    onApplyLog(resolved);
     resetAndClose();
   }
+
+  const readyForInput = !checkingKey && !!apiKey && !reviewEntries && !adjustSummary;
+  const showListeningState = readyForInput && (loading || (!!initialText && !initialTextHandled));
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={resetAndClose} presentationStyle="pageSheet">
@@ -145,7 +173,7 @@ export function VoiceLogModal({ visible, onClose, onApply }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Log by voice</Text>
+          <Text style={styles.title}>Voice command</Text>
           <Pressable onPress={resetAndClose} hitSlop={10}>
             <Ionicons name="close" size={26} color={colors.text} />
           </Pressable>
@@ -174,6 +202,11 @@ export function VoiceLogModal({ visible, onClose, onApply }: Props) {
             <Pressable style={styles.primaryButton} onPress={handleSaveApiKey}>
               <Text style={styles.primaryButtonText}>Save key</Text>
             </Pressable>
+          </View>
+        ) : adjustSummary ? (
+          <View style={styles.center}>
+            <Ionicons name="checkmark-circle" size={48} color={colors.success} />
+            <Text style={styles.adjustSummaryText}>{adjustSummary}</Text>
           </View>
         ) : reviewEntries ? (
           <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: spacing.xl }}>
@@ -223,11 +256,16 @@ export function VoiceLogModal({ visible, onClose, onApply }: Props) {
               <Text style={styles.primaryButtonText}>Apply to session</Text>
             </Pressable>
           </ScrollView>
+        ) : showListeningState ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.hint}>{initialText ? `"${initialText}"` : 'Thinking…'}</Text>
+          </View>
         ) : (
           <View style={styles.content}>
             <Text style={styles.hint}>
-              Describe what you did, or tap the mic on your keyboard to dictate. e.g. "Bulgarian split
-              squat, 3 sets of 12 at 15 kilos each leg."
+              Type what you did, or an instruction — e.g. "Bulgarian split squat, 3 sets of 12 at 15 kilos"
+              or "no legs today, my knee hurts."
             </Text>
             <TextInput
               style={[styles.input, styles.textArea]}
@@ -241,7 +279,7 @@ export function VoiceLogModal({ visible, onClose, onApply }: Props) {
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
             <Pressable
               style={[styles.primaryButton, (loading || !text.trim()) && styles.primaryButtonDisabled]}
-              onPress={handleParse}
+              onPress={() => handleParse(text)}
               disabled={loading || !text.trim()}
             >
               {loading ? (
@@ -292,6 +330,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+  },
+  adjustSummaryText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   label: {
     color: colors.text,
@@ -304,6 +350,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: spacing.md,
     lineHeight: 17,
+    textAlign: 'center',
   },
   input: {
     backgroundColor: colors.card,

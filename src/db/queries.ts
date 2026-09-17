@@ -32,6 +32,42 @@ export function addSessionExercise(
   return result.lastInsertRowId;
 }
 
+export interface SessionExerciseWrite {
+  exerciseId: string;
+  effort: EffortLevel | null;
+  sets: { weightKg: number | null; reps: number | null }[];
+}
+
+/**
+ * Wholesale-replaces a session's exercises/sets/effort — used both to save a session the first
+ * time and to save edits made after it's already finished, so "Finish" never has to be the last
+ * word on a session.
+ */
+export function replaceSessionExercises(sessionId: number, exercises: SessionExerciseWrite[]) {
+  getDb().withTransactionSync(() => {
+    getDb().runSync(
+      `DELETE FROM sets WHERE session_exercise_id IN (SELECT id FROM session_exercises WHERE session_id = ?)`,
+      [sessionId]
+    );
+    getDb().runSync('DELETE FROM session_exercises WHERE session_id = ?', [sessionId]);
+    exercises.forEach((ex, orderIndex) => {
+      const result = getDb().runSync(
+        'INSERT INTO session_exercises (session_id, exercise_id, order_index, effort) VALUES (?, ?, ?, ?)',
+        [sessionId, ex.exerciseId, orderIndex, ex.effort]
+      );
+      const sessionExerciseId = result.lastInsertRowId;
+      ex.sets.forEach((set, setIndex) => {
+        if (set.weightKg != null || set.reps != null) {
+          getDb().runSync(
+            'INSERT INTO sets (session_exercise_id, set_index, weight_kg, reps) VALUES (?, ?, ?, ?)',
+            [sessionExerciseId, setIndex, set.weightKg, set.reps]
+          );
+        }
+      });
+    });
+  });
+}
+
 export function upsertSet(
   sessionExerciseId: number,
   setIndex: number,

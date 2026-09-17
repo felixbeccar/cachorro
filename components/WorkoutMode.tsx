@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
@@ -7,10 +7,10 @@ import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flat
 import { ExerciseCard } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
 import { SessionReportCard } from './SessionReportCard';
+import { VoiceCommandBar } from './VoiceCommandBar';
 import { VoiceLogModal } from './VoiceLogModal';
 import { getExerciseById } from '../src/data/exercises';
 import {
-  addSessionExercise,
   createSession,
   deletePlannedSessionForDate,
   finishSession,
@@ -18,12 +18,12 @@ import {
   getLastSessionExerciseIds,
   getPlannedSession,
   getPreviousExerciseLog,
-  upsertSet,
+  replaceSessionExercises,
 } from '../src/db/queries';
 import { generateRoutine } from '../src/logic/routineGenerator';
 import { estimateSessionEffort } from '../src/logic/sessionReport';
 import { colors, radius, spacing } from '../src/theme';
-import { EffortLevel, Exercise, ExerciseStat, PreviousExerciseLog, RoutinePick, SetEntry } from '../src/types';
+import { EffortLevel, Exercise, ExerciseStat, MuscleGroup, PreviousExerciseLog, RoutinePick, SetEntry } from '../src/types';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -45,11 +45,14 @@ export function WorkoutMode() {
   const [setsByExercise, setSetsByExercise] = useState<Record<string, SetEntry[]>>({});
   const [doneByExercise, setDoneByExercise] = useState<Record<string, boolean>>({});
   const [effortByExercise, setEffortByExercise] = useState<Record<string, EffortLevel | null>>({});
-  const [finished, setFinished] = useState(false);
+  // Set once this session is first saved — further "Finish"/edits update the same DB row instead
+  // of creating a new one, so the session stays reachable and editable, not a dead end.
+  const [sessionId, setSessionId] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   // 'add' appends a new exercise; a number replaces the exercise at that index in `routine`.
   const [pickerTarget, setPickerTarget] = useState<'add' | number | null>(null);
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  const [pendingVoiceText, setPendingVoiceText] = useState<string | undefined>(undefined);
 
   const buildRoutine = useCallback((freshStats: Record<string, ExerciseStat>) => {
     const planned = getPlannedSession(todayISO());
@@ -77,7 +80,7 @@ export function WorkoutMode() {
     setSetsByExercise(sets);
     setDoneByExercise({});
     setEffortByExercise({});
-    setFinished(false);
+    setSessionId(null);
   }, []);
 
   useFocusEffect(
@@ -90,12 +93,6 @@ export function WorkoutMode() {
       }
     }, [loaded, buildRoutine])
   );
-
-  const totalSetsLogged = useMemo(() => {
-    return Object.values(setsByExercise)
-      .flat()
-      .filter((s) => s.reps != null).length;
-  }, [setsByExercise]);
 
   const previousLogByExercise = useMemo(() => {
     const map: Record<string, PreviousExerciseLog | null> = {};
@@ -222,6 +219,25 @@ export function WorkoutMode() {
     });
   }
 
+  function handleAdjustRoutine(excludeGroups: MuscleGroup[], setsOverride: number | null) {
+    const currentIds = routine.map((p) => p.exercise.id);
+    const freshStats = getExerciseStats();
+    const picks = generateRoutine(freshStats, currentIds, excludeGroups);
+    const sets: Record<string, SetEntry[]> = {};
+    for (const pick of picks) {
+      sets[pick.exercise.id] = makeDefaultSets(setsOverride ?? pick.exercise.defaultSets);
+    }
+    setRoutine(picks);
+    setSetsByExercise(sets);
+    setDoneByExercise({});
+    setEffortByExercise({});
+  }
+
+  function handleVoiceFinalText(text: string) {
+    setPendingVoiceText(text);
+    setVoiceModalVisible(true);
+  }
+
   function handleDragEnd(data: RoutinePick[]) {
     setRoutine(data);
   }
@@ -231,45 +247,25 @@ export function WorkoutMode() {
     [routine, previousLogByExercise]
   );
 
-  function handleFinish() {
-    if (totalSetsLogged === 0) {
-      Alert.alert('Nothing logged yet', 'Log at least one set before finishing.');
-      return;
+  function handleSave() {
+    let id = sessionId;
+    const isFirstSave = id == null;
+    if (id == null) {
+      id = createSession(todayISO());
+      setSessionId(id);
     }
-    const sessionId = createSession(todayISO());
-    routine.forEach((pick, orderIndex) => {
-      const effort = effortByExercise[pick.exercise.id] ?? null;
-      const sessionExerciseId = addSessionExercise(sessionId, pick.exercise.id, orderIndex, effort);
-      const sets = setsByExercise[pick.exercise.id] ?? [];
-      sets.forEach((set) => {
-        if (set.weightKg != null || set.reps != null) {
-          upsertSet(sessionExerciseId, set.setIndex, set.weightKg, set.reps);
-        }
-      });
-    });
-    finishSession(sessionId, new Date().toISOString());
-    deletePlannedSessionForDate(todayISO());
-    setFinished(true);
-  }
-
-  if (finished) {
-    return (
-      <View style={styles.center}>
-        <Ionicons name="checkmark-circle" size={64} color={colors.success} />
-        <Text style={styles.finishedTitle}>Workout saved</Text>
-        <Text style={styles.finishedSubtitle}>
-          {routine.length} exercises · {totalSetsLogged} sets logged
-        </Text>
-        <Pressable
-          style={styles.primaryButton}
-          onPress={() => {
-            setLoaded(false);
-          }}
-        >
-          <Text style={styles.primaryButtonText}>Start another session</Text>
-        </Pressable>
-      </View>
+    replaceSessionExercises(
+      id,
+      routine.map((pick) => ({
+        exerciseId: pick.exercise.id,
+        effort: effortByExercise[pick.exercise.id] ?? null,
+        sets: setsByExercise[pick.exercise.id] ?? [],
+      }))
     );
+    finishSession(id, new Date().toISOString());
+    if (isFirstSave) {
+      deletePlannedSessionForDate(todayISO());
+    }
   }
 
   function renderExercise({ item: pick, getIndex, drag, isActive }: RenderItemParams<RoutinePick>) {
@@ -306,7 +302,15 @@ export function WorkoutMode() {
           <>
             <View style={styles.headerRow}>
               <View>
-                <Text style={styles.title}>Today's session</Text>
+                <View style={styles.titleRow}>
+                  <Text style={styles.title}>Today's session</Text>
+                  {sessionId != null && (
+                    <View style={styles.savedPill}>
+                      <Ionicons name="checkmark" size={12} color={colors.success} />
+                      <Text style={styles.savedPillText}>Saved</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={styles.subtitle}>{routine.length} exercises, full body</Text>
               </View>
               <Pressable style={styles.regenButton} onPress={handleRegenerate}>
@@ -314,6 +318,13 @@ export function WorkoutMode() {
                 <Text style={styles.regenButtonText}>Regenerate</Text>
               </Pressable>
             </View>
+            <VoiceCommandBar
+              onFinalText={handleVoiceFinalText}
+              onTypeInstead={() => {
+                setPendingVoiceText(undefined);
+                setVoiceModalVisible(true);
+              }}
+            />
             <SessionReportCard exercises={routine.map((p) => p.exercise)} effort={sessionEffort} />
           </>
         }
@@ -324,13 +335,8 @@ export function WorkoutMode() {
               <Text style={styles.addExerciseButtonText}>Add exercise</Text>
             </Pressable>
 
-            <Pressable style={styles.addExerciseButton} onPress={() => setVoiceModalVisible(true)}>
-              <Ionicons name="mic-outline" size={18} color={colors.primary} />
-              <Text style={styles.addExerciseButtonText}>Log by voice</Text>
-            </Pressable>
-
-            <Pressable style={styles.primaryButton} onPress={handleFinish}>
-              <Text style={styles.primaryButtonText}>Finish workout</Text>
+            <Pressable style={styles.primaryButton} onPress={handleSave}>
+              <Text style={styles.primaryButtonText}>{sessionId != null ? 'Save changes' : 'Finish workout'}</Text>
             </Pressable>
           </>
         }
@@ -345,8 +351,13 @@ export function WorkoutMode() {
 
       <VoiceLogModal
         visible={voiceModalVisible}
-        onClose={() => setVoiceModalVisible(false)}
-        onApply={handleApplyVoiceLog}
+        initialText={pendingVoiceText}
+        onClose={() => {
+          setVoiceModalVisible(false);
+          setPendingVoiceText(undefined);
+        }}
+        onApplyLog={handleApplyVoiceLog}
+        onAdjustRoutine={(excludeGroups, setsOverride) => handleAdjustRoutine(excludeGroups, setsOverride)}
       />
     </View>
   );
@@ -367,10 +378,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   title: {
     color: colors.text,
     fontSize: 22,
     fontWeight: '800',
+  },
+  savedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: colors.successMuted,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  savedPillText: {
+    color: colors.success,
+    fontSize: 10,
+    fontWeight: '700',
   },
   subtitle: {
     color: colors.textMuted,
@@ -420,24 +450,5 @@ const styles = StyleSheet.create({
     color: colors.bg,
     fontSize: 15,
     fontWeight: '700',
-  },
-  center: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    gap: spacing.sm,
-  },
-  finishedTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '800',
-    marginTop: spacing.md,
-  },
-  finishedSubtitle: {
-    color: colors.textMuted,
-    fontSize: 14,
-    marginBottom: spacing.lg,
   },
 });
