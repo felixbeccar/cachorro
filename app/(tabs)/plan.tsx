@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { NestableScrollContainer } from 'react-native-draggable-flatlist';
 
 import { BodyDiagram } from '../../components/BodyDiagram';
 import { ExercisePickerModal } from '../../components/ExercisePickerModal';
+import { SessionReportCard } from '../../components/SessionReportCard';
 import { SessionTimeline } from '../../components/SessionTimeline';
 import { WeeklyScheduleEditor } from '../../components/WeeklyScheduleEditor';
 import { getExerciseById } from '../../src/data/exercises';
@@ -20,8 +22,10 @@ import {
 } from '../../src/db/queries';
 import { generateRoutine } from '../../src/logic/routineGenerator';
 import { activityForDate, getNextWeekDates } from '../../src/logic/schedule';
+import { estimateSessionEffort } from '../../src/logic/sessionReport';
 import { colors, radius, spacing } from '../../src/theme';
 import {
+  EffortLevel,
   Exercise,
   ExerciseStat,
   MuscleGroup,
@@ -131,14 +135,8 @@ export default function PlanScreen() {
     updatePlanned(date, (ids) => ids.filter((_, i) => i !== index));
   }
 
-  function handleMove(date: string, index: number, direction: -1 | 1) {
-    updatePlanned(date, (ids) => {
-      const target = index + direction;
-      if (target < 0 || target >= ids.length) return ids;
-      const next = [...ids];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
+  function handleReorder(date: string, reordered: Exercise[]) {
+    updatePlanned(date, () => reordered.map((e) => e.id));
   }
 
   function handleSelectFromPicker(exercise: Exercise) {
@@ -159,7 +157,7 @@ export default function PlanScreen() {
     : [];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <NestableScrollContainer style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Plan</Text>
 
       <Text style={styles.sectionTitle}>Weekly schedule</Text>
@@ -193,22 +191,24 @@ export default function PlanScreen() {
             .map((e) => getExerciseById(e.exerciseId))
             .filter((e): e is Exercise => !!e);
           const suggestedWeights: Record<string, number | null> = {};
+          const previousEfforts: (EffortLevel | null | undefined)[] = [];
           for (const exercise of exercises) {
             const log = getPreviousExerciseLog(exercise.id);
             const weights = log?.sets.map((s) => s.weightKg).filter((w): w is number => w != null) ?? [];
             suggestedWeights[exercise.id] = weights.length ? Math.max(...weights) : null;
+            previousEfforts.push(log?.effort);
           }
           return (
             <View key={date} style={styles.sessionCard}>
               <Text style={styles.sessionLabel}>{label}</Text>
+              <SessionReportCard exercises={exercises} effort={estimateSessionEffort(previousEfforts)} />
               <SessionTimeline
                 exercises={exercises}
                 suggestedWeights={suggestedWeights}
                 editable
                 onChangeExercise={(index) => setPickerTarget({ date, index })}
                 onRemove={(index) => handleRemove(date, index)}
-                onMoveUp={(index) => handleMove(date, index, -1)}
-                onMoveDown={(index) => handleMove(date, index, 1)}
+                onReorder={(reordered) => handleReorder(date, reordered)}
                 onAdd={() => setPickerTarget({ date, index: 'add' })}
               />
             </View>
@@ -231,7 +231,7 @@ export default function PlanScreen() {
         onSelect={handleSelectFromPicker}
         onClose={() => setPickerTarget(null)}
       />
-    </ScrollView>
+    </NestableScrollContainer>
   );
 }
 

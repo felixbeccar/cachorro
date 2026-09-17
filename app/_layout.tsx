@@ -1,6 +1,7 @@
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { initDatabase } from '../src/db/database';
 import { colors } from '../src/theme';
@@ -33,10 +34,12 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <ThemeProvider value={theme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-      </Stack>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={theme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

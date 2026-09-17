@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 
 import { ExerciseCard } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
+import { SessionReportCard } from './SessionReportCard';
 import { VoiceLogModal } from './VoiceLogModal';
 import { getExerciseById } from '../src/data/exercises';
 import {
@@ -19,6 +21,7 @@ import {
   upsertSet,
 } from '../src/db/queries';
 import { generateRoutine } from '../src/logic/routineGenerator';
+import { estimateSessionEffort } from '../src/logic/sessionReport';
 import { colors, radius, spacing } from '../src/theme';
 import { EffortLevel, Exercise, ExerciseStat, PreviousExerciseLog, RoutinePick, SetEntry } from '../src/types';
 
@@ -219,15 +222,14 @@ export function WorkoutMode() {
     });
   }
 
-  function handleMove(index: number, direction: -1 | 1) {
-    const target = index + direction;
-    if (target < 0 || target >= routine.length) return;
-    setRoutine((prev) => {
-      const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
+  function handleDragEnd(data: RoutinePick[]) {
+    setRoutine(data);
   }
+
+  const sessionEffort = useMemo(
+    () => estimateSessionEffort(routine.map((p) => previousLogByExercise[p.exercise.id]?.effort)),
+    [routine, previousLogByExercise]
+  );
 
   function handleFinish() {
     if (totalSetsLogged === 0) {
@@ -270,54 +272,69 @@ export function WorkoutMode() {
     );
   }
 
+  function renderExercise({ item: pick, getIndex, drag, isActive }: RenderItemParams<RoutinePick>) {
+    const i = getIndex() ?? 0;
+    return (
+      <ExerciseCard
+        exercise={pick.exercise}
+        isNew={pick.isNew}
+        sets={setsByExercise[pick.exercise.id] ?? []}
+        done={!!doneByExercise[pick.exercise.id]}
+        previousLog={previousLogByExercise[pick.exercise.id] ?? null}
+        effort={effortByExercise[pick.exercise.id] ?? null}
+        onChangeSet={(setIndex, field, value) => handleChangeSet(pick.exercise.id, setIndex, field, value)}
+        onAddSet={() => handleAddSet(pick.exercise.id)}
+        onToggleDone={() => handleToggleDone(pick.exercise.id)}
+        onChangeExercise={() => setPickerTarget(i)}
+        onRemove={() => handleRemoveExercise(i)}
+        onSetEffort={(effort) => handleSetEffort(pick.exercise.id, effort)}
+        onDragStart={drag}
+        dragActive={isActive}
+      />
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.title}>Today's session</Text>
-          <Text style={styles.subtitle}>~45 min · {routine.length} exercises, full body</Text>
-        </View>
-        <Pressable style={styles.regenButton} onPress={handleRegenerate}>
-          <Ionicons name="refresh" size={16} color={colors.primary} />
-          <Text style={styles.regenButtonText}>Regenerate</Text>
-        </Pressable>
-      </View>
+    <View style={styles.container}>
+      <DraggableFlatList
+        contentContainerStyle={styles.content}
+        data={routine}
+        keyExtractor={(pick) => pick.exercise.id}
+        renderItem={renderExercise}
+        onDragEnd={({ data }) => handleDragEnd(data)}
+        ListHeaderComponent={
+          <>
+            <View style={styles.headerRow}>
+              <View>
+                <Text style={styles.title}>Today's session</Text>
+                <Text style={styles.subtitle}>{routine.length} exercises, full body</Text>
+              </View>
+              <Pressable style={styles.regenButton} onPress={handleRegenerate}>
+                <Ionicons name="refresh" size={16} color={colors.primary} />
+                <Text style={styles.regenButtonText}>Regenerate</Text>
+              </Pressable>
+            </View>
+            <SessionReportCard exercises={routine.map((p) => p.exercise)} effort={sessionEffort} />
+          </>
+        }
+        ListFooterComponent={
+          <>
+            <Pressable style={styles.addExerciseButton} onPress={() => setPickerTarget('add')}>
+              <Ionicons name="add" size={18} color={colors.primary} />
+              <Text style={styles.addExerciseButtonText}>Add exercise</Text>
+            </Pressable>
 
-      {routine.map((pick, i) => (
-        <ExerciseCard
-          key={pick.exercise.id}
-          exercise={pick.exercise}
-          isNew={pick.isNew}
-          sets={setsByExercise[pick.exercise.id] ?? []}
-          done={!!doneByExercise[pick.exercise.id]}
-          canMoveUp={i > 0}
-          canMoveDown={i < routine.length - 1}
-          previousLog={previousLogByExercise[pick.exercise.id] ?? null}
-          effort={effortByExercise[pick.exercise.id] ?? null}
-          onChangeSet={(setIndex, field, value) => handleChangeSet(pick.exercise.id, setIndex, field, value)}
-          onAddSet={() => handleAddSet(pick.exercise.id)}
-          onToggleDone={() => handleToggleDone(pick.exercise.id)}
-          onChangeExercise={() => setPickerTarget(i)}
-          onRemove={() => handleRemoveExercise(i)}
-          onMoveUp={() => handleMove(i, -1)}
-          onMoveDown={() => handleMove(i, 1)}
-          onSetEffort={(effort) => handleSetEffort(pick.exercise.id, effort)}
-        />
-      ))}
+            <Pressable style={styles.addExerciseButton} onPress={() => setVoiceModalVisible(true)}>
+              <Ionicons name="mic-outline" size={18} color={colors.primary} />
+              <Text style={styles.addExerciseButtonText}>Log by voice</Text>
+            </Pressable>
 
-      <Pressable style={styles.addExerciseButton} onPress={() => setPickerTarget('add')}>
-        <Ionicons name="add" size={18} color={colors.primary} />
-        <Text style={styles.addExerciseButtonText}>Add exercise</Text>
-      </Pressable>
-
-      <Pressable style={styles.addExerciseButton} onPress={() => setVoiceModalVisible(true)}>
-        <Ionicons name="mic-outline" size={18} color={colors.primary} />
-        <Text style={styles.addExerciseButtonText}>Log by voice</Text>
-      </Pressable>
-
-      <Pressable style={styles.primaryButton} onPress={handleFinish}>
-        <Text style={styles.primaryButtonText}>Finish workout</Text>
-      </Pressable>
+            <Pressable style={styles.primaryButton} onPress={handleFinish}>
+              <Text style={styles.primaryButtonText}>Finish workout</Text>
+            </Pressable>
+          </>
+        }
+      />
 
       <ExercisePickerModal
         visible={pickerTarget !== null}
@@ -331,7 +348,7 @@ export function WorkoutMode() {
         onClose={() => setVoiceModalVisible(false)}
         onApply={handleApplyVoiceLog}
       />
-    </ScrollView>
+    </View>
   );
 }
 

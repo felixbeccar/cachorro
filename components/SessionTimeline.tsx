@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { NestableDraggableFlatList, RenderItemParams } from 'react-native-draggable-flatlist';
 
 import { estimateExerciseMinutes, estimateSessionMinutes, WARMUP_MINUTES } from '../src/logic/timeline';
 import { colors, radius, spacing } from '../src/theme';
@@ -11,8 +12,7 @@ interface Props {
   editable?: boolean;
   onChangeExercise?: (index: number) => void;
   onRemove?: (index: number) => void;
-  onMoveUp?: (index: number) => void;
-  onMoveDown?: (index: number) => void;
+  onReorder?: (exercises: Exercise[]) => void;
   onAdd?: () => void;
 }
 
@@ -27,11 +27,38 @@ export function SessionTimeline({
   editable = false,
   onChangeExercise,
   onRemove,
-  onMoveUp,
-  onMoveDown,
+  onReorder,
   onAdd,
 }: Props) {
   const totalMinutes = estimateSessionMinutes(exercises);
+
+  function renderRow({ item: exercise, getIndex, drag, isActive }: RenderItemParams<Exercise>) {
+    const i = getIndex() ?? 0;
+    return (
+      <View style={[styles.row, isActive && styles.rowDragging]}>
+        {editable && (
+          <Pressable hitSlop={12} onLongPress={drag} delayLongPress={150} style={styles.dragHandle}>
+            <Ionicons name="reorder-three" size={22} color={colors.textMuted} />
+          </Pressable>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.rowTitle}>{exercise.name}</Text>
+          <Text style={styles.rowSets}>{formatSetsLine(exercise, suggestedWeights[exercise.id])}</Text>
+        </View>
+        <Text style={styles.rowMinutes}>{estimateExerciseMinutes(exercise)}'</Text>
+        {editable && (
+          <View style={styles.editControls}>
+            <Pressable hitSlop={8} onPress={() => onChangeExercise?.(i)}>
+              <Ionicons name="swap-horizontal" size={16} color={colors.textMuted} />
+            </Pressable>
+            <Pressable hitSlop={8} onPress={() => onRemove?.(i)}>
+              <Ionicons name="trash-outline" size={16} color={colors.textMuted} />
+            </Pressable>
+          </View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View>
@@ -42,35 +69,13 @@ export function SessionTimeline({
         <Text style={styles.rowMinutes}>{WARMUP_MINUTES}'</Text>
       </View>
 
-      {exercises.map((exercise, i) => (
-        <View key={exercise.id} style={styles.row}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>{exercise.name}</Text>
-            <Text style={styles.rowSets}>{formatSetsLine(exercise, suggestedWeights[exercise.id])}</Text>
-          </View>
-          <Text style={styles.rowMinutes}>{estimateExerciseMinutes(exercise)}'</Text>
-          {editable && (
-            <View style={styles.editControls}>
-              <Pressable hitSlop={8} disabled={i === 0} onPress={() => onMoveUp?.(i)}>
-                <Ionicons name="chevron-up" size={16} color={i === 0 ? colors.border : colors.textMuted} />
-              </Pressable>
-              <Pressable hitSlop={8} disabled={i === exercises.length - 1} onPress={() => onMoveDown?.(i)}>
-                <Ionicons
-                  name="chevron-down"
-                  size={16}
-                  color={i === exercises.length - 1 ? colors.border : colors.textMuted}
-                />
-              </Pressable>
-              <Pressable hitSlop={8} onPress={() => onChangeExercise?.(i)}>
-                <Ionicons name="swap-horizontal" size={16} color={colors.textMuted} />
-              </Pressable>
-              <Pressable hitSlop={8} onPress={() => onRemove?.(i)}>
-                <Ionicons name="trash-outline" size={16} color={colors.textMuted} />
-              </Pressable>
-            </View>
-          )}
-        </View>
-      ))}
+      <NestableDraggableFlatList
+        data={exercises}
+        keyExtractor={(exercise) => exercise.id}
+        renderItem={renderRow}
+        onDragEnd={({ data }) => onReorder?.(data)}
+        scrollEnabled={false}
+      />
 
       {editable && (
         <Pressable style={styles.addButton} onPress={onAdd}>
@@ -91,6 +96,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  rowDragging: {
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.sm,
+  },
+  dragHandle: {
+    marginRight: spacing.sm,
   },
   rowTitle: {
     color: colors.text,

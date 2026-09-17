@@ -30,8 +30,6 @@ interface Props {
   isNew: boolean;
   sets: SetEntry[];
   done: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
   previousLog: PreviousExerciseLog | null;
   effort: EffortLevel | null;
   onChangeSet: (setIndex: number, field: 'weightKg' | 'reps', value: string) => void;
@@ -39,9 +37,10 @@ interface Props {
   onToggleDone: () => void;
   onChangeExercise: () => void;
   onRemove: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
   onSetEffort: (effort: EffortLevel) => void;
+  /** Long-press the drag handle to start reordering (from the enclosing DraggableFlatList). */
+  onDragStart?: () => void;
+  dragActive?: boolean;
 }
 
 export function ExerciseCard({
@@ -49,8 +48,6 @@ export function ExerciseCard({
   isNew,
   sets,
   done,
-  canMoveUp,
-  canMoveDown,
   previousLog,
   effort,
   onChangeSet,
@@ -58,25 +55,27 @@ export function ExerciseCard({
   onToggleDone,
   onChangeExercise,
   onRemove,
-  onMoveUp,
-  onMoveDown,
   onSetEffort,
+  onDragStart,
+  dragActive,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [frame, setFrame] = useState<0 | 1>(0);
   const demoImages = EXERCISE_IMAGES[exercise.id];
 
   return (
-    <View style={[styles.card, done && styles.cardDone]}>
+    <View style={[styles.card, done && styles.cardDone, dragActive && styles.cardDragging]}>
       <Pressable style={styles.header} onPress={() => setExpanded((e) => !e)}>
-        <View style={styles.orderColumn}>
-          <Pressable hitSlop={8} disabled={!canMoveUp} onPress={onMoveUp}>
-            <Ionicons name="chevron-up" size={18} color={canMoveUp ? colors.textMuted : colors.border} />
+        {onDragStart && (
+          <Pressable
+            hitSlop={12}
+            onLongPress={onDragStart}
+            delayLongPress={150}
+            style={styles.dragHandle}
+          >
+            <Ionicons name="reorder-three" size={26} color={colors.textMuted} />
           </Pressable>
-          <Pressable hitSlop={8} disabled={!canMoveDown} onPress={onMoveDown}>
-            <Ionicons name="chevron-down" size={18} color={canMoveDown ? colors.textMuted : colors.border} />
-          </Pressable>
-        </View>
+        )}
         <View style={{ flex: 1 }}>
           <View style={styles.titleRow}>
             <Text style={styles.name}>{exercise.name}</Text>
@@ -199,17 +198,18 @@ const styles = StyleSheet.create({
   cardDone: {
     borderColor: colors.success,
   },
+  cardDragging: {
+    borderColor: colors.primary,
+    opacity: 0.85,
+  },
   header: {
     flexDirection: 'row',
     padding: spacing.lg,
     alignItems: 'flex-start',
   },
-  orderColumn: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  dragHandle: {
     marginRight: spacing.sm,
     marginTop: spacing.xs,
-    gap: 2,
   },
   titleRow: {
     flexDirection: 'row',

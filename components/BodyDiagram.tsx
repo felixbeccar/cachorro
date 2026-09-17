@@ -4,6 +4,43 @@ import Svg, { Circle, Rect } from 'react-native-svg';
 import { colors, spacing } from '../src/theme';
 import { MuscleGroup } from '../src/types';
 
+interface FigureProps {
+  side: 'front' | 'back';
+  colorOf: (group: MuscleGroup) => string;
+  height?: number;
+}
+
+/** Shared body outline used by both the last/next comparison diagram and the single-session report. */
+export function MuscleFigure({ side, colorOf, height = 200 }: FigureProps) {
+  return (
+    <View style={styles.figureColumn}>
+      <Svg width="100%" height={height} viewBox="0 0 100 220">
+        <Circle cx={50} cy={14} r={12} fill={colors.cardAlt} />
+        <Rect x={44} y={24} width={12} height={10} fill={colors.cardAlt} />
+        <Rect x={32} y={92} width={15} height={90} rx={7} fill={colorOf('legs')} />
+        <Rect x={53} y={92} width={15} height={90} rx={7} fill={colorOf('legs')} />
+        <Circle cx={26} cy={38} r={9} fill={colorOf('shoulders')} />
+        <Circle cx={74} cy={38} r={9} fill={colorOf('shoulders')} />
+        <Rect x={10} y={40} width={13} height={58} rx={6} fill={colorOf('arms')} />
+        <Rect x={77} y={40} width={13} height={58} rx={6} fill={colorOf('arms')} />
+        {side === 'front' ? (
+          <>
+            <Rect x={30} y={84} width={40} height={12} rx={4} fill={colors.cardAlt} />
+            <Rect x={30} y={34} width={40} height={26} rx={10} fill={colorOf('chest')} />
+            <Rect x={34} y={60} width={32} height={26} rx={8} fill={colorOf('core')} />
+          </>
+        ) : (
+          <>
+            <Rect x={30} y={34} width={40} height={40} rx={10} fill={colorOf('back')} />
+            <Rect x={31} y={82} width={38} height={22} rx={9} fill={colorOf('glutes')} />
+          </>
+        )}
+      </Svg>
+      <Text style={styles.figureLabel}>{side === 'front' ? 'Front' : 'Back'}</Text>
+    </View>
+  );
+}
+
 interface Props {
   lastGroups: MuscleGroup[];
   nextGroups: MuscleGroup[];
@@ -41,40 +78,8 @@ export function BodyDiagram({ lastGroups, nextGroups }: Props) {
   return (
     <View>
       <View style={styles.figuresRow}>
-        <View style={styles.figureColumn}>
-          <Svg width="100%" height={200} viewBox="0 0 100 220">
-            {/* Front view */}
-            <Circle cx={50} cy={14} r={12} fill={colors.cardAlt} />
-            <Rect x={44} y={24} width={12} height={10} fill={colors.cardAlt} />
-            <Rect x={30} y={84} width={40} height={12} rx={4} fill={colors.cardAlt} />
-            <Rect x={32} y={92} width={15} height={90} rx={7} fill={colorOf('legs')} />
-            <Rect x={53} y={92} width={15} height={90} rx={7} fill={colorOf('legs')} />
-            <Circle cx={26} cy={38} r={9} fill={colorOf('shoulders')} />
-            <Circle cx={74} cy={38} r={9} fill={colorOf('shoulders')} />
-            <Rect x={10} y={40} width={13} height={58} rx={6} fill={colorOf('arms')} />
-            <Rect x={77} y={40} width={13} height={58} rx={6} fill={colorOf('arms')} />
-            <Rect x={30} y={34} width={40} height={26} rx={10} fill={colorOf('chest')} />
-            <Rect x={34} y={60} width={32} height={26} rx={8} fill={colorOf('core')} />
-          </Svg>
-          <Text style={styles.figureLabel}>Front</Text>
-        </View>
-
-        <View style={styles.figureColumn}>
-          <Svg width="100%" height={200} viewBox="0 0 100 220">
-            {/* Back view */}
-            <Circle cx={50} cy={14} r={12} fill={colors.cardAlt} />
-            <Rect x={44} y={24} width={12} height={10} fill={colors.cardAlt} />
-            <Rect x={32} y={92} width={15} height={90} rx={7} fill={colorOf('legs')} />
-            <Rect x={53} y={92} width={15} height={90} rx={7} fill={colorOf('legs')} />
-            <Circle cx={26} cy={38} r={9} fill={colorOf('shoulders')} />
-            <Circle cx={74} cy={38} r={9} fill={colorOf('shoulders')} />
-            <Rect x={10} y={40} width={13} height={58} rx={6} fill={colorOf('arms')} />
-            <Rect x={77} y={40} width={13} height={58} rx={6} fill={colorOf('arms')} />
-            <Rect x={30} y={34} width={40} height={40} rx={10} fill={colorOf('back')} />
-            <Rect x={31} y={82} width={38} height={22} rx={9} fill={colorOf('glutes')} />
-          </Svg>
-          <Text style={styles.figureLabel}>Back</Text>
-        </View>
+        <MuscleFigure side="front" colorOf={colorOf} />
+        <MuscleFigure side="back" colorOf={colorOf} />
       </View>
 
       <View style={styles.legend}>
