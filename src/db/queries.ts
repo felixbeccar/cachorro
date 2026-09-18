@@ -7,6 +7,9 @@ import {
   PreviousExerciseLog,
   ScheduleActivity,
   SessionRow,
+  VoiceCommandFeedback,
+  VoiceCommandIntent,
+  VoiceCommandLogRow,
   WeeklySchedule,
 } from '../types';
 
@@ -342,6 +345,66 @@ export function getLoggedExerciseIds(): string[] {
     WHERE s.finished_at IS NOT NULL
   `);
   return rows.map((r) => r.exercise_id);
+}
+
+function rowToVoiceCommandLog(row: {
+  id: number;
+  created_at: string;
+  session_date: string;
+  transcript: string;
+  intent: string;
+  result_summary: string;
+  feedback: string | null;
+  feedback_note: string | null;
+}): VoiceCommandLogRow {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    sessionDate: row.session_date,
+    transcript: row.transcript,
+    intent: row.intent as VoiceCommandIntent,
+    resultSummary: row.result_summary,
+    feedback: (row.feedback as VoiceCommandFeedback | null) ?? null,
+    feedbackNote: row.feedback_note,
+  };
+}
+
+export function logVoiceCommand(
+  sessionDate: string,
+  transcript: string,
+  intent: VoiceCommandIntent,
+  resultSummary: string
+): number {
+  const result = getDb().runSync(
+    'INSERT INTO voice_command_logs (created_at, session_date, transcript, intent, result_summary) VALUES (?, ?, ?, ?, ?)',
+    [new Date().toISOString(), sessionDate, transcript, intent, resultSummary]
+  );
+  return result.lastInsertRowId;
+}
+
+/** Voice commands from a given day that haven't been rated yet — drives the end-of-session feedback prompt. */
+export function getUnratedVoiceCommandsForDate(sessionDate: string): VoiceCommandLogRow[] {
+  return getDb()
+    .getAllSync<any>(
+      'SELECT * FROM voice_command_logs WHERE session_date = ? AND feedback IS NULL ORDER BY id ASC',
+      [sessionDate]
+    )
+    .map(rowToVoiceCommandLog);
+}
+
+export function setVoiceCommandFeedback(id: number, feedback: VoiceCommandFeedback, note: string | null) {
+  getDb().runSync('UPDATE voice_command_logs SET feedback = ?, feedback_note = ? WHERE id = ?', [
+    feedback,
+    note,
+    id,
+  ]);
+}
+
+/** All logged voice commands, newest first — used to export a review log. */
+export function getAllVoiceCommandLogs(): VoiceCommandLogRow[] {
+  return getDb()
+    .getAllSync<any>('SELECT * FROM voice_command_logs ORDER BY id DESC')
+    .map(rowToVoiceCommandLog);
 }
 
 export function setStretchLogCompleted(dateISO: string, completed: boolean) {

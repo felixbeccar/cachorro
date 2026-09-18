@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
@@ -9,6 +9,7 @@ import { getExerciseById } from '../../src/data/exercises';
 import {
   deleteSession,
   getAllSessionDates,
+  getAllVoiceCommandLogs,
   getExerciseHistory,
   getExerciseIdsSince,
   getLoggedExerciseIds,
@@ -98,6 +99,25 @@ export default function ProgressScreen() {
     ]);
   }
 
+  async function handleShareVoiceLog() {
+    const logs = getAllVoiceCommandLogs();
+    if (logs.length === 0) {
+      Alert.alert('No voice commands yet', "Use the voice command on Today's tab a few times first.");
+      return;
+    }
+    const lines = logs.map((log) => {
+      const rating = log.feedback === 'up' ? '👍' : log.feedback === 'down' ? '👎' : '—';
+      const note = log.feedbackNote ? ` (note: ${log.feedbackNote})` : '';
+      return `[${log.sessionDate}] "${log.transcript}" → ${log.intent}: ${log.resultSummary} ${rating}${note}`;
+    });
+    const message = `cachorro voice command log (${logs.length} entries)\n\n${lines.join('\n')}`;
+    try {
+      await Share.share({ message });
+    } catch {
+      // User cancelled the share sheet — nothing to do.
+    }
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Progress</Text>
@@ -162,6 +182,13 @@ export default function ProgressScreen() {
           </View>
         </>
       )}
+
+      <Text style={styles.sectionTitle}>Voice command log</Text>
+      <Text style={styles.sectionCaption}>Every voice command you've used, with your 👍/👎 ratings — share it over to review and improve.</Text>
+      <Pressable style={styles.shareButton} onPress={handleShareVoiceLog}>
+        <Ionicons name="share-outline" size={16} color={colors.primary} />
+        <Text style={styles.shareButtonText}>Share voice command log</Text>
+      </Pressable>
 
       <Text style={styles.sectionTitle}>Recent sessions</Text>
       {sessions.length === 0 ? (
@@ -271,6 +298,23 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.textMuted,
     fontSize: 13,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  shareButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   pickerRow: {
     marginBottom: spacing.sm,

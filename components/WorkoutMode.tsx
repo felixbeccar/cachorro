@@ -8,6 +8,7 @@ import { ExerciseCard } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
 import { SessionReportCard } from './SessionReportCard';
 import { VoiceCommandBar } from './VoiceCommandBar';
+import { VoiceFeedbackModal } from './VoiceFeedbackModal';
 import { VoiceLogModal } from './VoiceLogModal';
 import { getExerciseById } from '../src/data/exercises';
 import {
@@ -18,12 +19,22 @@ import {
   getLastSessionExerciseIds,
   getPlannedSession,
   getPreviousExerciseLog,
+  getUnratedVoiceCommandsForDate,
   replaceSessionExercises,
 } from '../src/db/queries';
 import { generateRoutine } from '../src/logic/routineGenerator';
 import { estimateSessionEffort } from '../src/logic/sessionReport';
 import { colors, radius, spacing } from '../src/theme';
-import { EffortLevel, Exercise, ExerciseStat, MuscleGroup, PreviousExerciseLog, RoutinePick, SetEntry } from '../src/types';
+import {
+  EffortLevel,
+  Exercise,
+  ExerciseStat,
+  MuscleGroup,
+  PreviousExerciseLog,
+  RoutinePick,
+  SetEntry,
+  VoiceCommandLogRow,
+} from '../src/types';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -56,6 +67,7 @@ export function WorkoutMode() {
   // True while any card is being dragged — collapses every card (see ExerciseCard's
   // listDragging prop) so reordering isn't autoscrolling through full-height cards.
   const [isDragging, setIsDragging] = useState(false);
+  const [feedbackLogs, setFeedbackLogs] = useState<VoiceCommandLogRow[] | null>(null);
 
   const buildRoutine = useCallback((freshStats: Record<string, ExerciseStat>) => {
     const planned = getPlannedSession(todayISO());
@@ -270,6 +282,10 @@ export function WorkoutMode() {
     if (isFirstSave) {
       deletePlannedSessionForDate(todayISO());
     }
+    const unrated = getUnratedVoiceCommandsForDate(todayISO());
+    if (unrated.length > 0) {
+      setFeedbackLogs(unrated);
+    }
   }
 
   function renderExercise({ item: pick, getIndex, drag, isActive }: RenderItemParams<RoutinePick>) {
@@ -369,6 +385,12 @@ export function WorkoutMode() {
         }}
         onApplyLog={handleApplyVoiceLog}
         onAdjustRoutine={(excludeGroups, setsOverride) => handleAdjustRoutine(excludeGroups, setsOverride)}
+      />
+
+      <VoiceFeedbackModal
+        visible={feedbackLogs != null}
+        logs={feedbackLogs ?? []}
+        onClose={() => setFeedbackLogs(null)}
       />
     </View>
   );

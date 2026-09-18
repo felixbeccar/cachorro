@@ -16,9 +16,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { clearApiKey, getApiKey, setApiKey as saveApiKey } from '../src/ai/apiKeyStore';
 import { parseVoiceCommand } from '../src/ai/parseVoiceCommand';
 import { getExerciseById } from '../src/data/exercises';
+import { logVoiceCommand } from '../src/db/queries';
 import { colors, radius, spacing } from '../src/theme';
 import { Exercise, MuscleGroup } from '../src/types';
 import { ExercisePickerModal } from './ExercisePickerModal';
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 interface ReviewSet {
   weightKg: number | null;
@@ -105,6 +110,7 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
     setErrorMessage('');
     try {
       const result = await parseVoiceCommand(apiKey, spokenText.trim());
+      logVoiceCommand(todayISO(), spokenText.trim(), result.intent, result.summary);
       if (result.intent === 'log_sets') {
         setReviewEntries(
           result.logEntries.map((p) => ({

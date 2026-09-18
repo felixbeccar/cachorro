@@ -58,10 +58,22 @@ export function initDatabase() {
       order_index INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS voice_command_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL,
+      session_date TEXT NOT NULL,
+      transcript TEXT NOT NULL,
+      intent TEXT NOT NULL,
+      result_summary TEXT NOT NULL,
+      feedback TEXT,
+      feedback_note TEXT
+    );
+
     CREATE INDEX IF NOT EXISTS idx_session_exercises_session ON session_exercises(session_id);
     CREATE INDEX IF NOT EXISTS idx_session_exercises_exercise ON session_exercises(exercise_id);
     CREATE INDEX IF NOT EXISTS idx_sets_session_exercise ON sets(session_exercise_id);
     CREATE INDEX IF NOT EXISTS idx_planned_session_exercises_session ON planned_session_exercises(planned_session_id);
+    CREATE INDEX IF NOT EXISTS idx_voice_command_logs_date ON voice_command_logs(session_date);
   `);
 
   // Migration for databases created before the `effort` column existed.

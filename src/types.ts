@@ -108,3 +108,17 @@ export interface PlannedSession {
   date: string;
   exercises: PlannedSessionExercise[];
 }
+
+export type VoiceCommandIntent = 'log_sets' | 'adjust_routine' | 'unclear';
+export type VoiceCommandFeedback = 'up' | 'down';
+
+export interface VoiceCommandLogRow {
+  id: number;
+  createdAt: string;
+  sessionDate: string;
+  transcript: string;
+  intent: VoiceCommandIntent;
+  resultSummary: string;
+  feedback: VoiceCommandFeedback | null;
+  feedbackNote: string | null;
+}
