@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
+import { NestableDraggableFlatList, NestableScrollContainer, RenderItemParams } from 'react-native-draggable-flatlist';
 
 import { ExerciseCard } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
@@ -315,9 +315,36 @@ export function WorkoutMode() {
   }
 
   return (
-    <View style={styles.container}>
-      <DraggableFlatList
-        contentContainerStyle={styles.content}
+    <NestableScrollContainer style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.headerRow}>
+        <View>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>Today's session</Text>
+            {sessionId != null && (
+              <View style={styles.savedPill}>
+                <Ionicons name="checkmark" size={12} color={colors.success} />
+                <Text style={styles.savedPillText}>Saved</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.subtitle}>{routine.length} exercises, full body</Text>
+        </View>
+        <Pressable style={styles.regenButton} onPress={handleRegenerate}>
+          <Ionicons name="refresh" size={16} color={colors.primary} />
+          <Text style={styles.regenButtonText}>Regenerate</Text>
+        </Pressable>
+      </View>
+
+      <VoiceCommandBar
+        onFinalText={handleVoiceFinalText}
+        onTypeInstead={() => {
+          setPendingVoiceText(undefined);
+          setVoiceModalVisible(true);
+        }}
+      />
+      <SessionReportCard exercises={routine.map((p) => p.exercise)} effort={sessionEffort} />
+
+      <NestableDraggableFlatList
         data={routine}
         keyExtractor={(pick) => pick.exercise.id}
         renderItem={renderExercise}
@@ -325,49 +352,16 @@ export function WorkoutMode() {
         onDragEnd={({ data }) => handleDragEnd(data)}
         autoscrollSpeed={150}
         autoscrollThreshold={80}
-        ListHeaderComponent={
-          <>
-            <View style={styles.headerRow}>
-              <View>
-                <View style={styles.titleRow}>
-                  <Text style={styles.title}>Today's session</Text>
-                  {sessionId != null && (
-                    <View style={styles.savedPill}>
-                      <Ionicons name="checkmark" size={12} color={colors.success} />
-                      <Text style={styles.savedPillText}>Saved</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.subtitle}>{routine.length} exercises, full body</Text>
-              </View>
-              <Pressable style={styles.regenButton} onPress={handleRegenerate}>
-                <Ionicons name="refresh" size={16} color={colors.primary} />
-                <Text style={styles.regenButtonText}>Regenerate</Text>
-              </Pressable>
-            </View>
-            <VoiceCommandBar
-              onFinalText={handleVoiceFinalText}
-              onTypeInstead={() => {
-                setPendingVoiceText(undefined);
-                setVoiceModalVisible(true);
-              }}
-            />
-            <SessionReportCard exercises={routine.map((p) => p.exercise)} effort={sessionEffort} />
-          </>
-        }
-        ListFooterComponent={
-          <>
-            <Pressable style={styles.addExerciseButton} onPress={() => setPickerTarget('add')}>
-              <Ionicons name="add" size={18} color={colors.primary} />
-              <Text style={styles.addExerciseButtonText}>Add exercise</Text>
-            </Pressable>
-
-            <Pressable style={styles.primaryButton} onPress={handleSave}>
-              <Text style={styles.primaryButtonText}>{sessionId != null ? 'Save changes' : 'Finish workout'}</Text>
-            </Pressable>
-          </>
-        }
       />
+
+      <Pressable style={styles.addExerciseButton} onPress={() => setPickerTarget('add')}>
+        <Ionicons name="add" size={18} color={colors.primary} />
+        <Text style={styles.addExerciseButtonText}>Add exercise</Text>
+      </Pressable>
+
+      <Pressable style={styles.primaryButton} onPress={handleSave}>
+        <Text style={styles.primaryButtonText}>{sessionId != null ? 'Save changes' : 'Finish workout'}</Text>
+      </Pressable>
 
       <ExercisePickerModal
         visible={pickerTarget !== null}
@@ -392,7 +386,7 @@ export function WorkoutMode() {
         logs={feedbackLogs ?? []}
         onClose={() => setFeedbackLogs(null)}
       />
-    </View>
+    </NestableScrollContainer>
   );
 }
 
