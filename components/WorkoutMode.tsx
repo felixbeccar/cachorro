@@ -23,6 +23,7 @@ import {
 } from '../src/db/queries';
 import { generateRoutine } from '../src/logic/routineGenerator';
 import { estimateSessionEffort } from '../src/logic/sessionReport';
+import { buildSessionTemplates, maybePickTemplate, templateToPicks } from '../src/logic/sessionTemplates';
 import { colors, radius, spacing } from '../src/theme';
 import {
   EffortLevel,
@@ -35,8 +36,16 @@ import {
   VoiceCommandLogRow,
 } from '../src/types';
 
+// Matches the app's own ~40-45 min target — used to find a matching past session when a voice
+// command didn't give an explicit duration.
+const DEFAULT_TARGET_MINUTES = 42;
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function formatShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function makeDefaultSets(count: number): SetEntry[] {
@@ -47,6 +56,28 @@ function parseNumber(value: string): number | null {
   if (value.trim() === '') return null;
   const n = Number(value.replace(',', '.'));
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Either reuses a past session that's a good match ("learning" from history), or falls back to
+ * generating fresh — see maybePickTemplate for the odds and matching rules.
+ */
+function pickRoutine(
+  freshStats: Record<string, ExerciseStat>,
+  avoidIds: string[],
+  excludeGroups: MuscleGroup[] = [],
+  targetMinutes: number | null = null,
+  setsOverride: number | null = null
+): { picks: RoutinePick[]; templateDate: string | null } {
+  const templates = buildSessionTemplates();
+  const template = maybePickTemplate(templates, targetMinutes ?? DEFAULT_TARGET_MINUTES, excludeGroups, avoidIds);
+  if (template) {
+    return { picks: templateToPicks(template, freshStats), templateDate: template.date };
+  }
+  return {
+    picks: generateRoutine(freshStats, avoidIds, excludeGroups, targetMinutes, setsOverride),
+    templateDate: null,
+  };
 }
 
 export function WorkoutMode() {
@@ -64,10 +95,13 @@ export function WorkoutMode() {
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [pendingVoiceText, setPendingVoiceText] = useState<string | undefined>(undefined);
   const [feedbackLogs, setFeedbackLogs] = useState<VoiceCommandLogRow[] | null>(null);
+  // Set when today's routine is a repeat of a good past session rather than freshly generated.
+  const [templateDate, setTemplateDate] = useState<string | null>(null);
 
   const buildRoutine = useCallback((freshStats: Record<string, ExerciseStat>) => {
     const planned = getPlannedSession(todayISO());
     let picks: RoutinePick[];
+    let templateDate: string | null = null;
     if (planned && planned.exercises.length > 0) {
       // Today was set up from the Plan tab — use that instead of generating a fresh one, so
       // edits made there actually show up here.
@@ -81,7 +115,9 @@ export function WorkoutMode() {
         }));
     } else {
       const avoidIds = getLastSessionExerciseIds();
-      picks = generateRoutine(freshStats, avoidIds);
+      const result = pickRoutine(freshStats, avoidIds);
+      picks = result.picks;
+      templateDate = result.templateDate;
     }
     const sets: Record<string, SetEntry[]> = {};
     for (const pick of picks) {
@@ -92,6 +128,7 @@ export function WorkoutMode() {
     setDoneByExercise({});
     setEffortByExercise({});
     setSessionId(null);
+    setTemplateDate(templateDate);
   }, []);
 
   useFocusEffect(
@@ -117,7 +154,7 @@ export function WorkoutMode() {
     const currentIds = routine.map((p) => p.exercise.id);
     const freshStats = getExerciseStats();
     setStats(freshStats);
-    const picks = generateRoutine(freshStats, currentIds);
+    const { picks, templateDate } = pickRoutine(freshStats, currentIds);
     const sets: Record<string, SetEntry[]> = {};
     for (const pick of picks) {
       sets[pick.exercise.id] = makeDefaultSets(pick.exercise.defaultSets);
@@ -126,11 +163,13 @@ export function WorkoutMode() {
     setSetsByExercise(sets);
     setDoneByExercise({});
     setEffortByExercise({});
+    setTemplateDate(templateDate);
   }
 
   function handleSelectFromPicker(exercise: Exercise) {
     const isNew = !stats[exercise.id] || stats[exercise.id].timesDone === 0;
     const newPick: RoutinePick = { exercise, isNew, group: exercise.muscleGroups[0] };
+    setTemplateDate(null);
 
     if (pickerTarget === 'add') {
       setRoutine((prev) => [...prev, newPick]);
@@ -162,6 +201,7 @@ export function WorkoutMode() {
 
   function handleRemoveExercise(index: number) {
     const removed = routine[index];
+    setTemplateDate(null);
     setRoutine((prev) => prev.filter((_, i) => i !== index));
     setSetsByExercise((prev) => {
       const next = { ...prev };
@@ -219,6 +259,7 @@ export function WorkoutMode() {
       }
     }
     if (additions.length > 0) {
+      setTemplateDate(null);
       setRoutine((prev) => [...prev, ...additions]);
     }
     setSetsByExercise((prev) => {
@@ -233,7 +274,7 @@ export function WorkoutMode() {
   function handleAdjustRoutine(excludeGroups: MuscleGroup[], setsOverride: number | null, targetMinutes: number | null) {
     const currentIds = routine.map((p) => p.exercise.id);
     const freshStats = getExerciseStats();
-    const picks = generateRoutine(freshStats, currentIds, excludeGroups, targetMinutes, setsOverride);
+    const { picks, templateDate } = pickRoutine(freshStats, currentIds, excludeGroups, targetMinutes, setsOverride);
     const sets: Record<string, SetEntry[]> = {};
     for (const pick of picks) {
       sets[pick.exercise.id] = makeDefaultSets(setsOverride ?? pick.exercise.defaultSets);
@@ -242,6 +283,7 @@ export function WorkoutMode() {
     setSetsByExercise(sets);
     setDoneByExercise({});
     setEffortByExercise({});
+    setTemplateDate(templateDate);
   }
 
   function handleVoiceFinalText(text: string) {
@@ -302,7 +344,10 @@ export function WorkoutMode() {
               </View>
             )}
           </View>
-          <Text style={styles.subtitle}>{routine.length} exercises, full body</Text>
+          <Text style={styles.subtitle}>
+            {routine.length} exercises, full body
+            {templateDate ? ` · repeating ${formatShortDate(templateDate)}` : ''}
+          </Text>
         </View>
         <Pressable style={styles.regenButton} onPress={handleRegenerate}>
           <Ionicons name="refresh" size={16} color={colors.primary} />
