@@ -42,7 +42,12 @@ interface Props {
   initialText?: string;
   onClose: () => void;
   onApplyLog: (entries: { exercise: Exercise; sets: ReviewSet[] }[]) => void;
-  onAdjustRoutine: (excludeGroups: MuscleGroup[], setsOverride: number | null, summary: string) => void;
+  onAdjustRoutine: (
+    excludeGroups: MuscleGroup[],
+    setsOverride: number | null,
+    targetMinutes: number | null,
+    summary: string
+  ) => void;
 }
 
 function parseNumber(value: string): number | null {
@@ -120,7 +125,12 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
           }))
         );
       } else if (result.intent === 'adjust_routine') {
-        onAdjustRoutine(result.excludeMuscleGroups as MuscleGroup[], result.setsOverride, result.summary);
+        onAdjustRoutine(
+          result.excludeMuscleGroups as MuscleGroup[],
+          result.setsOverride,
+          result.targetMinutes,
+          result.summary
+        );
         setAdjustSummary(result.summary || 'Session updated.');
         setTimeout(resetAndClose, 1800);
       } else {

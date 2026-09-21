@@ -17,6 +17,7 @@ export interface ParsedVoiceCommand {
   logEntries: ParsedLogEntry[];
   excludeMuscleGroups: string[];
   setsOverride: number | null;
+  targetMinutes: number | null;
   summary: string;
 }
 
@@ -78,6 +79,15 @@ const TOOL_SCHEMA = {
           'Only for intent=adjust_routine. A new number of sets per exercise for the whole session ' +
           '(e.g. 2 for "light"/"tired"/"short on time", 4 for "go hard"). Null to leave sets as they are.',
       },
+      targetMinutes: {
+        type: ['number', 'null'],
+        description:
+          'Only for intent=adjust_routine, and only when they gave an explicit session length ' +
+          '("45 minutes", "half an hour", "plan 45\'"). The routine will be padded with extra exercises ' +
+          'in the included muscle groups to fill this time — important when they also narrowed to just ' +
+          'one or two groups (e.g. "legs and core, 45 minutes" needs several leg/core exercises, not one ' +
+          'of each). Null if no duration was mentioned.',
+      },
       summary: {
         type: 'string',
         description:
@@ -85,7 +95,7 @@ const TOOL_SCHEMA = {
           '(e.g. "Skipping legs and glutes, 2 sets per exercise today." or "Logged 3 sets of squats.").',
       },
     },
-    required: ['intent', 'logEntries', 'excludeMuscleGroups', 'setsOverride', 'summary'],
+    required: ['intent', 'logEntries', 'excludeMuscleGroups', 'setsOverride', 'targetMinutes', 'summary'],
   },
 };
 
@@ -108,16 +118,33 @@ Exercise catalog (id: name):
 ${catalog}
 
 2. Asking to change today's plan ("I'm wiped, make it light", "no legs today, my knee hurts", "skip
-   shoulders", "give me a harder session") → intent=adjust_routine.
+   shoulders", "legs and core, 45 minutes", "give me a harder session") → intent=adjust_routine.
    Muscle groups (id: label): ${groups}
-   - Map what they said to excludeMuscleGroups. An injury or pain mention usually means excluding that
-     group AND any group that shares a lot of the same movements (e.g. knee/leg pain → legs and glutes).
+   - If they named the groups they DO want (e.g. "legs and core today"), set excludeMuscleGroups to every
+     OTHER group — everything not named gets excluded. If they named a group to skip (e.g. "no legs"), just
+     exclude that one (plus any group sharing the same movements, per the injury rule below).
+   - Exception: legs and glutes are trained together in practice and the exercise catalog reflects that —
+     don't exclude one just because only the other was named (e.g. "just legs today" keeps glutes in too).
+     Only exclude one without the other if they're clearly distinguishing between the two (e.g. "legs but
+     not glutes", or an injury specific to one).
+   - An injury or pain mention means excluding that group AND any group that shares a lot of the same
+     movements (e.g. knee/leg pain → legs and glutes).
    - Map tiredness/soreness/short-on-time language to a lower setsOverride (2), and "go hard"/"more
      intense" language to a higher one (4). Leave setsOverride null if they didn't say anything about
      volume/intensity.
+   - If they gave an explicit session length ("45 minutes", "half an hour", "plan 45'"), set
+     targetMinutes to that many minutes — this matters most when they've also narrowed to one or two
+     groups, since without it the routine would only pick one exercise per group and fall way short of
+     the requested time. Leave targetMinutes null if no duration was mentioned.
 
-If what they said doesn't clearly fit either case, use intent=unclear with empty logEntries/excludeMuscleGroups
-and setsOverride=null, and a summary explaining you didn't catch a usable instruction.`;
+Speech-to-text mishears things. If a word doesn't match any muscle group or exercise but sounds close to
+one and the rest of the sentence is clearly a workout instruction (e.g. "legs and cold" when talking about
+today's session — "cold" isn't a muscle group but sounds like "core"), infer the intended word rather than
+returning unclear. Only use intent=unclear when nothing in the message reasonably maps to logging a set or
+adjusting the routine, even allowing for mishearings.
+
+If what they said doesn't clearly fit either case, use intent=unclear with empty logEntries/excludeMuscleGroups,
+setsOverride=null, targetMinutes=null, and a summary explaining you didn't catch a usable instruction.`;
 }
 
 export async function parseVoiceCommand(apiKey: string, text: string): Promise<ParsedVoiceCommand> {
@@ -162,6 +189,7 @@ export async function parseVoiceCommand(apiKey: string, text: string): Promise<P
     logEntries: Array.isArray(input.logEntries) ? input.logEntries : [],
     excludeMuscleGroups: Array.isArray(input.excludeMuscleGroups) ? input.excludeMuscleGroups : [],
     setsOverride: typeof input.setsOverride === 'number' ? input.setsOverride : null,
+    targetMinutes: typeof input.targetMinutes === 'number' ? input.targetMinutes : null,
     summary: typeof input.summary === 'string' ? input.summary : '',
   };
 }

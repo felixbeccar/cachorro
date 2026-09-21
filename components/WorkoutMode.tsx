@@ -230,10 +230,10 @@ export function WorkoutMode() {
     });
   }
 
-  function handleAdjustRoutine(excludeGroups: MuscleGroup[], setsOverride: number | null) {
+  function handleAdjustRoutine(excludeGroups: MuscleGroup[], setsOverride: number | null, targetMinutes: number | null) {
     const currentIds = routine.map((p) => p.exercise.id);
     const freshStats = getExerciseStats();
-    const picks = generateRoutine(freshStats, currentIds, excludeGroups);
+    const picks = generateRoutine(freshStats, currentIds, excludeGroups, targetMinutes, setsOverride);
     const sets: Record<string, SetEntry[]> = {};
     for (const pick of picks) {
       sets[pick.exercise.id] = makeDefaultSets(setsOverride ?? pick.exercise.defaultSets);
@@ -365,7 +365,9 @@ export function WorkoutMode() {
           setPendingVoiceText(undefined);
         }}
         onApplyLog={handleApplyVoiceLog}
-        onAdjustRoutine={(excludeGroups, setsOverride) => handleAdjustRoutine(excludeGroups, setsOverride)}
+        onAdjustRoutine={(excludeGroups, setsOverride, targetMinutes) =>
+          handleAdjustRoutine(excludeGroups, setsOverride, targetMinutes)
+        }
       />
 
       <VoiceFeedbackModal

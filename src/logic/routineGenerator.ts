@@ -1,5 +1,6 @@
 import { EXERCISES } from '../data/exercises';
-import { ExerciseStat, MUSCLE_GROUPS, MuscleGroup, RoutinePick } from '../types';
+import { estimateExerciseMinutes, WARMUP_MINUTES } from './timeline';
+import { Exercise, ExerciseStat, MUSCLE_GROUPS, MuscleGroup, RoutinePick } from '../types';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -22,34 +23,45 @@ function noveltyScore(exerciseId: string, stats: Record<string, ExerciseStat>): 
  * `excludeIds` lets the caller avoid repeating exercises picked for another group in the same routine
  * (some exercises hit multiple groups) and `avoidIds` (e.g. last session's picks) nudges variety further.
  * `excludeGroups` drops whole muscle groups from the routine (e.g. a voice command to skip legs).
+ * `targetMinutes` + `setsOverride` (both usually from a voice command) pad the routine with extra
+ * exercises — round-robin across the active groups — until the estimated session length reaches
+ * the target. Without this, narrowing to 1-2 groups (e.g. "just legs and core") would leave a
+ * session with only 1-2 exercises, far short of a full workout.
  */
 export function generateRoutine(
   stats: Record<string, ExerciseStat>,
   avoidIds: string[] = [],
-  excludeGroups: MuscleGroup[] = []
+  excludeGroups: MuscleGroup[] = [],
+  targetMinutes: number | null = null,
+  setsOverride: number | null = null
 ): RoutinePick[] {
   const avoidSet = new Set(avoidIds);
   const excludedGroups = new Set(excludeGroups);
   const usedIds = new Set<string>();
   const picks: RoutinePick[] = [];
+  const activeGroups = MUSCLE_GROUPS.filter((g) => !excludedGroups.has(g));
 
-  for (const group of MUSCLE_GROUPS) {
-    if (excludedGroups.has(group)) continue;
-    const candidates = EXERCISES.filter(
+  function candidatesFor(group: MuscleGroup): Exercise[] {
+    return EXERCISES.filter(
       (e) =>
         e.muscleGroups.includes(group) &&
         !usedIds.has(e.id) &&
         !e.manualOnly &&
         !e.muscleGroups.some((g) => excludedGroups.has(g))
     );
-    if (candidates.length === 0) continue;
+  }
 
-    const ranked = [...candidates].sort((a, b) => {
+  function rank(candidates: Exercise[]): Exercise[] {
+    return [...candidates].sort((a, b) => {
       const scoreA = noveltyScore(a.id, stats) - (avoidSet.has(a.id) ? 500 : 0);
       const scoreB = noveltyScore(b.id, stats) - (avoidSet.has(b.id) ? 500 : 0);
       return scoreB - scoreA;
     });
+  }
 
+  function pickBestFor(group: MuscleGroup): boolean {
+    const ranked = rank(candidatesFor(group));
+    if (ranked.length === 0) return false;
     const chosen = ranked[0];
     usedIds.add(chosen.id);
     picks.push({
@@ -57,6 +69,27 @@ export function generateRoutine(
       isNew: !stats[chosen.id] || stats[chosen.id].timesDone === 0,
       group,
     });
+    return true;
+  }
+
+  for (const group of activeGroups) {
+    pickBestFor(group);
+  }
+
+  if (targetMinutes != null) {
+    let minutes = WARMUP_MINUTES + picks.reduce((sum, p) => sum + estimateExerciseMinutes(p.exercise, setsOverride), 0);
+    let addedThisPass = true;
+    while (minutes < targetMinutes && addedThisPass) {
+      addedThisPass = false;
+      for (const group of activeGroups) {
+        if (minutes >= targetMinutes) break;
+        const before = picks.length;
+        if (pickBestFor(group)) {
+          minutes += estimateExerciseMinutes(picks[picks.length - 1].exercise, setsOverride);
+          addedThisPass = picks.length > before;
+        }
+      }
+    }
   }
 
   return picks;
