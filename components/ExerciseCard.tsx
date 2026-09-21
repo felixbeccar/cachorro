@@ -39,12 +39,10 @@ interface Props {
   onChangeExercise: () => void;
   onRemove: () => void;
   onSetEffort: (effort: EffortLevel) => void;
-  /** Long-press the drag handle to start reordering (from the enclosing DraggableFlatList). */
-  onDragStart?: () => void;
-  dragActive?: boolean;
-  /** True while any card in the list is being dragged — collapses every card so reordering
-   * doesn't mean auto-scrolling through full-height photos/set tables to find a drop spot. */
-  listDragging?: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }
 
 export function ExerciseCard({
@@ -60,28 +58,36 @@ export function ExerciseCard({
   onChangeExercise,
   onRemove,
   onSetEffort,
-  onDragStart,
-  dragActive,
-  listDragging,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [frame, setFrame] = useState<0 | 1>(0);
   const demoImages = EXERCISE_IMAGES[exercise.id];
-  const showBody = expanded && !listDragging;
 
   return (
-    <View style={[styles.card, done && styles.cardDone, dragActive && styles.cardDragging]}>
-      <Pressable style={styles.header} onPress={() => !listDragging && setExpanded((e) => !e)}>
-        {onDragStart && (
+    <View style={[styles.card, done && styles.cardDone]}>
+      <Pressable style={styles.header} onPress={() => setExpanded((e) => !e)}>
+        <View style={styles.orderColumn}>
           <Pressable
-            hitSlop={12}
-            onLongPress={onDragStart}
-            delayLongPress={150}
-            style={styles.dragHandle}
+            hitSlop={8}
+            disabled={!canMoveUp}
+            onPress={onMoveUp}
+            style={[styles.orderButton, !canMoveUp && styles.orderButtonDisabled]}
           >
-            <Ionicons name="reorder-three" size={26} color={colors.textMuted} />
+            <Ionicons name="chevron-up" size={20} color={canMoveUp ? colors.text : colors.border} />
           </Pressable>
-        )}
+          <Pressable
+            hitSlop={8}
+            disabled={!canMoveDown}
+            onPress={onMoveDown}
+            style={[styles.orderButton, !canMoveDown && styles.orderButtonDisabled]}
+          >
+            <Ionicons name="chevron-down" size={20} color={canMoveDown ? colors.text : colors.border} />
+          </Pressable>
+        </View>
         <View style={{ flex: 1 }}>
           <View style={styles.titleRow}>
             <Text style={styles.name}>{exercise.name}</Text>
@@ -92,42 +98,34 @@ export function ExerciseCard({
               </View>
             )}
           </View>
-          {!listDragging && (
-            <>
-              <View style={styles.badgeRow}>
-                {exercise.muscleGroups.map((g) => (
-                  <MuscleBadge key={g} group={g} />
-                ))}
-              </View>
-              <Text style={styles.meta}>
-                {exercise.equipment} · Target {exercise.defaultSets} x {exercise.defaultReps}
-              </Text>
-              {previousLog && (
-                <Text style={styles.previousText}>
-                  Previous: {formatShortDate(previousLog.date)} · {summarizePreviousSets(previousLog.sets)}
-                  {previousLog.effort ? ` · Effort: ${EFFORT_LABEL[previousLog.effort]}` : ''}
-                </Text>
-              )}
-            </>
+          <View style={styles.badgeRow}>
+            {exercise.muscleGroups.map((g) => (
+              <MuscleBadge key={g} group={g} />
+            ))}
+          </View>
+          <Text style={styles.meta}>
+            {exercise.equipment} · Target {exercise.defaultSets} x {exercise.defaultReps}
+          </Text>
+          {previousLog && (
+            <Text style={styles.previousText}>
+              Previous: {formatShortDate(previousLog.date)} · {summarizePreviousSets(previousLog.sets)}
+              {previousLog.effort ? ` · Effort: ${EFFORT_LABEL[previousLog.effort]}` : ''}
+            </Text>
           )}
         </View>
-        {!listDragging && (
-          <>
-            <Pressable hitSlop={10} onPress={onRemove} style={styles.removeButton}>
-              <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
-            </Pressable>
-            <Pressable hitSlop={10} onPress={onToggleDone} style={styles.checkbox}>
-              <Ionicons
-                name={done ? 'checkmark-circle' : 'ellipse-outline'}
-                size={28}
-                color={done ? colors.success : colors.textMuted}
-              />
-            </Pressable>
-          </>
-        )}
+        <Pressable hitSlop={10} onPress={onRemove} style={styles.removeButton}>
+          <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
+        </Pressable>
+        <Pressable hitSlop={10} onPress={onToggleDone} style={styles.checkbox}>
+          <Ionicons
+            name={done ? 'checkmark-circle' : 'ellipse-outline'}
+            size={28}
+            color={done ? colors.success : colors.textMuted}
+          />
+        </Pressable>
       </Pressable>
 
-      {showBody && (
+      {expanded && (
         <View style={styles.body}>
           {demoImages && (
             <Pressable onPress={() => setFrame((f) => (f === 0 ? 1 : 0))} style={styles.demoWrap}>
@@ -213,18 +211,28 @@ const styles = StyleSheet.create({
   cardDone: {
     borderColor: colors.success,
   },
-  cardDragging: {
-    borderColor: colors.primary,
-    opacity: 0.85,
-  },
   header: {
     flexDirection: 'row',
     padding: spacing.lg,
     alignItems: 'flex-start',
   },
-  dragHandle: {
-    marginRight: spacing.sm,
-    marginTop: spacing.xs,
+  orderColumn: {
+    alignItems: 'center',
+    marginRight: spacing.md,
+    gap: spacing.sm,
+  },
+  orderButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    backgroundColor: colors.cardAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orderButtonDisabled: {
+    opacity: 0.4,
   },
   titleRow: {
     flexDirection: 'row',

@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { NestableDraggableFlatList, NestableScrollContainer, RenderItemParams } from 'react-native-draggable-flatlist';
 
 import { ExerciseCard } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
@@ -64,9 +63,6 @@ export function WorkoutMode() {
   const [pickerTarget, setPickerTarget] = useState<'add' | number | null>(null);
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [pendingVoiceText, setPendingVoiceText] = useState<string | undefined>(undefined);
-  // True while any card is being dragged — collapses every card (see ExerciseCard's
-  // listDragging prop) so reordering isn't autoscrolling through full-height cards.
-  const [isDragging, setIsDragging] = useState(false);
   const [feedbackLogs, setFeedbackLogs] = useState<VoiceCommandLogRow[] | null>(null);
 
   const buildRoutine = useCallback((freshStats: Record<string, ExerciseStat>) => {
@@ -253,9 +249,14 @@ export function WorkoutMode() {
     setVoiceModalVisible(true);
   }
 
-  function handleDragEnd(data: RoutinePick[]) {
-    setRoutine(data);
-    setIsDragging(false);
+  function handleMove(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= routine.length) return;
+    setRoutine((prev) => {
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   }
 
   const sessionEffort = useMemo(
@@ -288,34 +289,8 @@ export function WorkoutMode() {
     }
   }
 
-  function renderExercise({ item: pick, getIndex, drag, isActive }: RenderItemParams<RoutinePick>) {
-    const i = getIndex() ?? 0;
-    return (
-      <ExerciseCard
-        exercise={pick.exercise}
-        isNew={pick.isNew}
-        sets={setsByExercise[pick.exercise.id] ?? []}
-        done={!!doneByExercise[pick.exercise.id]}
-        previousLog={previousLogByExercise[pick.exercise.id] ?? null}
-        effort={effortByExercise[pick.exercise.id] ?? null}
-        onChangeSet={(setIndex, field, value) => handleChangeSet(pick.exercise.id, setIndex, field, value)}
-        onAddSet={() => handleAddSet(pick.exercise.id)}
-        onToggleDone={() => handleToggleDone(pick.exercise.id)}
-        onChangeExercise={() => setPickerTarget(i)}
-        onRemove={() => handleRemoveExercise(i)}
-        onSetEffort={(effort) => handleSetEffort(pick.exercise.id, effort)}
-        onDragStart={() => {
-          setIsDragging(true);
-          drag();
-        }}
-        dragActive={isActive}
-        listDragging={isDragging}
-      />
-    );
-  }
-
   return (
-    <NestableScrollContainer style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <View>
           <View style={styles.titleRow}>
@@ -344,15 +319,27 @@ export function WorkoutMode() {
       />
       <SessionReportCard exercises={routine.map((p) => p.exercise)} effort={sessionEffort} />
 
-      <NestableDraggableFlatList
-        data={routine}
-        keyExtractor={(pick) => pick.exercise.id}
-        renderItem={renderExercise}
-        onDragBegin={() => setIsDragging(true)}
-        onDragEnd={({ data }) => handleDragEnd(data)}
-        autoscrollSpeed={150}
-        autoscrollThreshold={80}
-      />
+      {routine.map((pick, i) => (
+        <ExerciseCard
+          key={pick.exercise.id}
+          exercise={pick.exercise}
+          isNew={pick.isNew}
+          sets={setsByExercise[pick.exercise.id] ?? []}
+          done={!!doneByExercise[pick.exercise.id]}
+          canMoveUp={i > 0}
+          canMoveDown={i < routine.length - 1}
+          previousLog={previousLogByExercise[pick.exercise.id] ?? null}
+          effort={effortByExercise[pick.exercise.id] ?? null}
+          onChangeSet={(setIndex, field, value) => handleChangeSet(pick.exercise.id, setIndex, field, value)}
+          onAddSet={() => handleAddSet(pick.exercise.id)}
+          onToggleDone={() => handleToggleDone(pick.exercise.id)}
+          onChangeExercise={() => setPickerTarget(i)}
+          onRemove={() => handleRemoveExercise(i)}
+          onSetEffort={(effort) => handleSetEffort(pick.exercise.id, effort)}
+          onMoveUp={() => handleMove(i, -1)}
+          onMoveDown={() => handleMove(i, 1)}
+        />
+      ))}
 
       <Pressable style={styles.addExerciseButton} onPress={() => setPickerTarget('add')}>
         <Ionicons name="add" size={18} color={colors.primary} />
@@ -386,7 +373,7 @@ export function WorkoutMode() {
         logs={feedbackLogs ?? []}
         onClose={() => setFeedbackLogs(null)}
       />
-    </NestableScrollContainer>
+    </ScrollView>
   );
 }
 

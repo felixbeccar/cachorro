@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { NestableScrollContainer } from 'react-native-draggable-flatlist';
 
 import { BodyDiagram } from '../../components/BodyDiagram';
 import { ExercisePickerModal } from '../../components/ExercisePickerModal';
@@ -135,8 +134,14 @@ export default function PlanScreen() {
     updatePlanned(date, (ids) => ids.filter((_, i) => i !== index));
   }
 
-  function handleReorder(date: string, reordered: Exercise[]) {
-    updatePlanned(date, () => reordered.map((e) => e.id));
+  function handleMove(date: string, index: number, direction: -1 | 1) {
+    updatePlanned(date, (ids) => {
+      const target = index + direction;
+      if (target < 0 || target >= ids.length) return ids;
+      const next = [...ids];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   }
 
   function handleSelectFromPicker(exercise: Exercise) {
@@ -157,7 +162,7 @@ export default function PlanScreen() {
     : [];
 
   return (
-    <NestableScrollContainer style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Plan</Text>
 
       <Text style={styles.sectionTitle}>Weekly schedule</Text>
@@ -208,7 +213,8 @@ export default function PlanScreen() {
                 editable
                 onChangeExercise={(index) => setPickerTarget({ date, index })}
                 onRemove={(index) => handleRemove(date, index)}
-                onReorder={(reordered) => handleReorder(date, reordered)}
+                onMoveUp={(index) => handleMove(date, index, -1)}
+                onMoveDown={(index) => handleMove(date, index, 1)}
                 onAdd={() => setPickerTarget({ date, index: 'add' })}
               />
             </View>
@@ -231,7 +237,7 @@ export default function PlanScreen() {
         onSelect={handleSelectFromPicker}
         onClose={() => setPickerTarget(null)}
       />
-    </NestableScrollContainer>
+    </ScrollView>
   );
 }
 
