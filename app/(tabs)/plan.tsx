@@ -14,6 +14,7 @@ import {
   getLastSessionExerciseIds,
   getPlannedSession,
   getPreviousExerciseLog,
+  getSessionDetail,
   getWeeklySchedule,
   listSessions,
   setDaySchedule,
@@ -63,6 +64,7 @@ export default function PlanScreen() {
   const [schedule, setSchedule] = useState<WeeklySchedule>({});
   const [plannedByDate, setPlannedByDate] = useState<Record<string, PlannedSession>>({});
   const [doneGymDates, setDoneGymDates] = useState<Set<string>>(new Set());
+  const [finishedSessionIdByDate, setFinishedSessionIdByDate] = useState<Record<string, number>>({});
   const [lastGroups, setLastGroups] = useState<MuscleGroup[]>([]);
   const [nextGroups, setNextGroups] = useState<MuscleGroup[]>([]);
   const [pickerTarget, setPickerTarget] = useState<{ date: string; index: number | 'add' } | null>(null);
@@ -70,7 +72,12 @@ export default function PlanScreen() {
   const loadWeek = useCallback(() => {
     const freshSchedule = getWeeklySchedule();
     const freshStats: Record<string, ExerciseStat> = getExerciseStats();
-    const finishedDates = new Set(listSessions().map((s) => s.date));
+    const finishedSessions = listSessions();
+    const finishedDates = new Set(finishedSessions.map((s) => s.date));
+    // listSessions() is most-recent-first, so an earlier same-day duplicate would win here —
+    // fine in practice since a day only ever has one finished session.
+    const sessionIdByDate: Record<string, number> = {};
+    for (const s of finishedSessions) sessionIdByDate[s.date] = s.id;
     const weekDates = getNextWeekDates();
 
     const planned: Record<string, PlannedSession> = {};
@@ -97,6 +104,7 @@ export default function PlanScreen() {
     setDoneGymDates(
       new Set(weekDates.filter((d) => activityForDate(freshSchedule, d) === 'gym' && finishedDates.has(d)))
     );
+    setFinishedSessionIdByDate(sessionIdByDate);
     setLastGroups(muscleGroupsFor(getLastSessionExerciseIds()));
 
     const firstPlannedDate = weekDates.find((d) => planned[d]);
@@ -180,12 +188,18 @@ export default function PlanScreen() {
         const label = formatDayLabel(date);
 
         if (activity === 'gym' && doneGymDates.has(date)) {
+          const sessionId = finishedSessionIdByDate[date];
+          const detail = sessionId != null ? getSessionDetail(sessionId) : [];
+          const exercises = detail.map((d) => getExerciseById(d.exerciseId)).filter((e): e is Exercise => !!e);
           return (
-            <View key={date} style={styles.simpleRow}>
-              <Text style={styles.simpleRowLabel}>
-                {label} — {SCHEDULE_ACTIVITY_LABEL.gym}
-              </Text>
-              <Text style={styles.simpleRowDone}>Done</Text>
+            <View key={date} style={styles.sessionCard}>
+              <View style={styles.sessionHeaderRow}>
+                <Text style={[styles.sessionLabel, styles.sessionLabelInRow]}>{label}</Text>
+                <Text style={styles.simpleRowDone}>Done</Text>
+              </View>
+              {exercises.length > 0 && (
+                <SessionReportCard exercises={exercises} effort={estimateSessionEffort(detail.map((d) => d.effort))} />
+              )}
             </View>
           );
         }
@@ -290,6 +304,15 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     marginBottom: spacing.sm,
+  },
+  sessionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  sessionLabelInRow: {
+    marginBottom: 0,
   },
   simpleRow: {
     flexDirection: 'row',
