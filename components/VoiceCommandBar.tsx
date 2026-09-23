@@ -8,6 +8,7 @@ import { colors, radius, spacing } from '../src/theme';
 interface Props {
   onFinalText: (text: string) => void;
   onTypeInstead: () => void;
+  idleHint?: string;
 }
 
 /**
@@ -15,7 +16,11 @@ interface Props {
  * text box, no second tap on a keyboard mic icon. Say a set you just did, or an instruction like
  * "no legs today" / "make it a light session", and the final transcript is handed to the caller.
  */
-export function VoiceCommandBar({ onFinalText, onTypeInstead }: Props) {
+export function VoiceCommandBar({
+  onFinalText,
+  onTypeInstead,
+  idleHint = '"No legs today" · "3 sets of 12 at 15kg" · tap to talk',
+}: Props) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [deniedPermission, setDeniedPermission] = useState(false);
@@ -87,7 +92,7 @@ export function VoiceCommandBar({ onFinalText, onTypeInstead }: Props) {
         <Ionicons name={listening ? 'radio-button-on' : 'mic'} size={18} color={listening ? colors.bg : colors.primary} />
       </View>
       <Text style={styles.barText} numberOfLines={1}>
-        {listening ? transcript || 'Listening…' : '"No legs today" · "3 sets of 12 at 15kg" · tap to talk'}
+        {listening ? transcript || 'Listening…' : idleHint}
       </Text>
       {listening && (
         <Text style={styles.stopHint}>tap to stop</Text>

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -6,6 +6,7 @@ import { useFocusEffect } from 'expo-router';
 import { ExerciseCard } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
 import { SessionReportCard } from './SessionReportCard';
+import { SessionSetup } from './SessionSetup';
 import { VoiceCommandBar } from './VoiceCommandBar';
 import { VoiceFeedbackModal } from './VoiceFeedbackModal';
 import { VoiceLogModal } from './VoiceLogModal';
@@ -18,8 +19,11 @@ import {
   getLastSessionExerciseIds,
   getPlannedSession,
   getPreviousExerciseLog,
+  getSessionDetail,
+  getSessionForDate,
   getUnratedVoiceCommandsForDate,
   replaceSessionExercises,
+  startSession,
 } from '../src/db/queries';
 import { generateRoutine } from '../src/logic/routineGenerator';
 import { estimateSessionEffort } from '../src/logic/sessionReport';
@@ -29,6 +33,7 @@ import {
   EffortLevel,
   Exercise,
   ExerciseStat,
+  MUSCLE_GROUPS,
   MuscleGroup,
   PreviousExerciseLog,
   RoutinePick,
@@ -48,8 +53,27 @@ function formatShortDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
 function makeDefaultSets(count: number): SetEntry[] {
   return Array.from({ length: count }, (_, i) => ({ setIndex: i, weightKg: null, reps: null }));
+}
+
+/** Pads a resumed session's logged sets back out to at least the exercise's usual set count. */
+function hydrateSets(exercise: Exercise, logged: { setIndex: number; weightKg: number | null; reps: number | null }[]): SetEntry[] {
+  const count = Math.max(exercise.defaultSets, ...logged.map((s) => s.setIndex + 1), 1);
+  const byIndex = new Map(logged.map((s) => [s.setIndex, s]));
+  return Array.from({ length: count }, (_, i) => {
+    const existing = byIndex.get(i);
+    return { setIndex: i, weightKg: existing?.weightKg ?? null, reps: existing?.reps ?? null };
+  });
 }
 
 function parseNumber(value: string): number | null {
@@ -80,15 +104,21 @@ function pickRoutine(
   };
 }
 
+type Phase = 'loading' | 'setup' | 'built';
+
 export function WorkoutMode() {
+  const [phase, setPhase] = useState<Phase>('loading');
   const [stats, setStats] = useState<Record<string, ExerciseStat>>({});
   const [routine, setRoutine] = useState<RoutinePick[]>([]);
   const [setsByExercise, setSetsByExercise] = useState<Record<string, SetEntry[]>>({});
   const [doneByExercise, setDoneByExercise] = useState<Record<string, boolean>>({});
   const [effortByExercise, setEffortByExercise] = useState<Record<string, EffortLevel | null>>({});
-  // Set once this session is first saved — further "Finish"/edits update the same DB row instead
-  // of creating a new one, so the session stays reachable and editable, not a dead end.
+  // Set once this session has a DB row — further "Finish"/edits update the same row instead of
+  // creating a new one, so the session stays reachable and editable, not a dead end.
   const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
+  const [sessionFinished, setSessionFinished] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const [loaded, setLoaded] = useState(false);
   // 'add' appends a new exercise; a number replaces the exercise at that index in `routine`.
   const [pickerTarget, setPickerTarget] = useState<'add' | number | null>(null);
@@ -98,14 +128,49 @@ export function WorkoutMode() {
   // Set when today's routine is a repeat of a good past session rather than freshly generated.
   const [templateDate, setTemplateDate] = useState<string | null>(null);
 
-  const buildRoutine = useCallback((freshStats: Record<string, ExerciseStat>) => {
+  const loadToday = useCallback(() => {
+    const freshStats = getExerciseStats();
+    setStats(freshStats);
+    setTemplateDate(null);
+    setPickerTarget(null);
+
+    const existing = getSessionForDate(todayISO());
+    if (existing) {
+      // Already started and/or finished today — resume exactly what's there instead of
+      // generating something new (and losing today's real logged sets).
+      const detail = getSessionDetail(existing.id);
+      const picks: RoutinePick[] = [];
+      const sets: Record<string, SetEntry[]> = {};
+      const effortByEx: Record<string, EffortLevel | null> = {};
+      const doneByEx: Record<string, boolean> = {};
+      for (const d of detail) {
+        const exercise = getExerciseById(d.exerciseId);
+        if (!exercise) continue;
+        picks.push({
+          exercise,
+          isNew: !freshStats[exercise.id] || freshStats[exercise.id].timesDone === 0,
+          group: exercise.muscleGroups[0],
+        });
+        sets[exercise.id] = hydrateSets(exercise, d.sets);
+        effortByEx[exercise.id] = d.effort;
+        doneByEx[exercise.id] = d.sets.some((s) => s.weightKg != null || s.reps != null);
+      }
+      setRoutine(picks);
+      setSetsByExercise(sets);
+      setDoneByExercise(doneByEx);
+      setEffortByExercise(effortByEx);
+      setSessionId(existing.id);
+      setSessionStartedAt(existing.startedAt ? new Date(existing.startedAt).getTime() : null);
+      setSessionFinished(!!existing.finishedAt);
+      setPhase('built');
+      return;
+    }
+
     const planned = getPlannedSession(todayISO());
-    let picks: RoutinePick[];
-    let templateDate: string | null = null;
     if (planned && planned.exercises.length > 0) {
       // Today was set up from the Plan tab — use that instead of generating a fresh one, so
       // edits made there actually show up here.
-      picks = planned.exercises
+      const picks = planned.exercises
         .map((pe) => getExerciseById(pe.exerciseId))
         .filter((e): e is Exercise => !!e)
         .map((exercise) => ({
@@ -113,34 +178,44 @@ export function WorkoutMode() {
           isNew: !freshStats[exercise.id] || freshStats[exercise.id].timesDone === 0,
           group: exercise.muscleGroups[0],
         }));
-    } else {
-      const avoidIds = getLastSessionExerciseIds();
-      const result = pickRoutine(freshStats, avoidIds);
-      picks = result.picks;
-      templateDate = result.templateDate;
+      const sets: Record<string, SetEntry[]> = {};
+      for (const pick of picks) sets[pick.exercise.id] = makeDefaultSets(pick.exercise.defaultSets);
+      setRoutine(picks);
+      setSetsByExercise(sets);
+      setDoneByExercise({});
+      setEffortByExercise({});
+      setSessionId(null);
+      setSessionStartedAt(null);
+      setSessionFinished(false);
+      setPhase('built');
+      return;
     }
-    const sets: Record<string, SetEntry[]> = {};
-    for (const pick of picks) {
-      sets[pick.exercise.id] = makeDefaultSets(pick.exercise.defaultSets);
-    }
-    setRoutine(picks);
-    setSetsByExercise(sets);
+
+    // Totally fresh day — nothing planned, nothing started. Ask what to train.
+    setRoutine([]);
+    setSetsByExercise({});
     setDoneByExercise({});
     setEffortByExercise({});
     setSessionId(null);
-    setTemplateDate(templateDate);
+    setSessionStartedAt(null);
+    setSessionFinished(false);
+    setPhase('setup');
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       if (!loaded) {
-        const freshStats = getExerciseStats();
-        setStats(freshStats);
-        buildRoutine(freshStats);
+        loadToday();
         setLoaded(true);
       }
-    }, [loaded, buildRoutine])
+    }, [loaded, loadToday])
   );
+
+  useEffect(() => {
+    if (sessionStartedAt == null || sessionFinished) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [sessionStartedAt, sessionFinished]);
 
   const previousLogByExercise = useMemo(() => {
     const map: Record<string, PreviousExerciseLog | null> = {};
@@ -150,20 +225,38 @@ export function WorkoutMode() {
     return map;
   }, [routine]);
 
-  function handleRegenerate() {
-    const currentIds = routine.map((p) => p.exercise.id);
-    const freshStats = getExerciseStats();
-    setStats(freshStats);
-    const { picks, templateDate } = pickRoutine(freshStats, currentIds);
+  function applyBuiltRoutine(picks: RoutinePick[], templateDate: string | null, setsOverride: number | null = null) {
     const sets: Record<string, SetEntry[]> = {};
     for (const pick of picks) {
-      sets[pick.exercise.id] = makeDefaultSets(pick.exercise.defaultSets);
+      sets[pick.exercise.id] = makeDefaultSets(setsOverride ?? pick.exercise.defaultSets);
     }
     setRoutine(picks);
     setSetsByExercise(sets);
     setDoneByExercise({});
     setEffortByExercise({});
     setTemplateDate(templateDate);
+    setPhase('built');
+  }
+
+  function handleBuildFromGroups(selectedGroups: MuscleGroup[]) {
+    const selected = new Set(selectedGroups);
+    // Legs and glutes are trained together — selecting Legs keeps glutes in too (same pairing
+    // rule the voice command uses). Nothing checked at all means full body, exclude nothing.
+    const excludeGroups: MuscleGroup[] =
+      selected.size === 0 ? [] : MUSCLE_GROUPS.filter((g) => (g === 'glutes' ? !selected.has('legs') : !selected.has(g)));
+    const freshStats = getExerciseStats();
+    setStats(freshStats);
+    const avoidIds = getLastSessionExerciseIds();
+    const { picks, templateDate } = pickRoutine(freshStats, avoidIds, excludeGroups);
+    applyBuiltRoutine(picks, templateDate);
+  }
+
+  function handleRegenerate() {
+    const currentIds = routine.map((p) => p.exercise.id);
+    const freshStats = getExerciseStats();
+    setStats(freshStats);
+    const { picks, templateDate } = pickRoutine(freshStats, currentIds);
+    applyBuiltRoutine(picks, templateDate);
   }
 
   function handleSelectFromPicker(exercise: Exercise) {
@@ -242,10 +335,14 @@ export function WorkoutMode() {
 
   function handleToggleDone(exerciseId: string) {
     setDoneByExercise((prev) => ({ ...prev, [exerciseId]: !prev[exerciseId] }));
+    // Checkpoint: marking an exercise done is a natural "save what I've got" moment mid-session.
+    if (sessionId != null) persistSnapshot(sessionId, routine, setsByExercise, effortByExercise);
   }
 
   function handleSetEffort(exerciseId: string, effort: EffortLevel) {
-    setEffortByExercise((prev) => ({ ...prev, [exerciseId]: prev[exerciseId] === effort ? null : effort }));
+    const next = { ...effortByExercise, [exerciseId]: effortByExercise[exerciseId] === effort ? null : effort };
+    setEffortByExercise(next);
+    if (sessionId != null) persistSnapshot(sessionId, routine, setsByExercise, next);
   }
 
   function handleApplyVoiceLog(entries: { exercise: Exercise; sets: { weightKg: number | null; reps: number | null }[] }[]) {
@@ -269,21 +366,14 @@ export function WorkoutMode() {
       }
       return next;
     });
+    setPhase('built');
   }
 
   function handleAdjustRoutine(excludeGroups: MuscleGroup[], setsOverride: number | null, targetMinutes: number | null) {
     const currentIds = routine.map((p) => p.exercise.id);
     const freshStats = getExerciseStats();
     const { picks, templateDate } = pickRoutine(freshStats, currentIds, excludeGroups, targetMinutes, setsOverride);
-    const sets: Record<string, SetEntry[]> = {};
-    for (const pick of picks) {
-      sets[pick.exercise.id] = makeDefaultSets(setsOverride ?? pick.exercise.defaultSets);
-    }
-    setRoutine(picks);
-    setSetsByExercise(sets);
-    setDoneByExercise({});
-    setEffortByExercise({});
-    setTemplateDate(templateDate);
+    applyBuiltRoutine(picks, templateDate, setsOverride);
   }
 
   function handleVoiceFinalText(text: string) {
@@ -306,29 +396,88 @@ export function WorkoutMode() {
     [routine, previousLogByExercise]
   );
 
-  function handleSave() {
-    let id = sessionId;
-    const isFirstSave = id == null;
-    if (id == null) {
-      id = createSession(todayISO());
-      setSessionId(id);
-    }
+  /** Writes the routine/sets/effort to `session_exercises` so the session survives an app kill mid-workout. */
+  function persistSnapshot(
+    id: number,
+    r: RoutinePick[],
+    sets: Record<string, SetEntry[]>,
+    effort: Record<string, EffortLevel | null>
+  ) {
     replaceSessionExercises(
       id,
-      routine.map((pick) => ({
+      r.map((pick) => ({
         exerciseId: pick.exercise.id,
-        effort: effortByExercise[pick.exercise.id] ?? null,
-        sets: setsByExercise[pick.exercise.id] ?? [],
+        effort: effort[pick.exercise.id] ?? null,
+        sets: sets[pick.exercise.id] ?? [],
       }))
     );
-    finishSession(id, new Date().toISOString());
-    if (isFirstSave) {
-      deletePlannedSessionForDate(todayISO());
+  }
+
+  function handleStartSession() {
+    const nowISO = new Date().toISOString();
+    let id = sessionId;
+    if (id == null) {
+      id = createSession(todayISO(), nowISO);
+      setSessionId(id);
+    } else {
+      startSession(id, nowISO);
     }
+    // Write the routine immediately, not just at Finish — otherwise the app being killed
+    // mid-workout leaves a session row with no exercises, and resuming loses everything.
+    persistSnapshot(id, routine, setsByExercise, effortByExercise);
+    setSessionStartedAt(new Date(nowISO).getTime());
+    setNow(Date.now());
+    setSessionFinished(false);
+  }
+
+  function handleSave() {
+    let id = sessionId;
+    const nowISO = new Date().toISOString();
+    if (id == null) {
+      id = createSession(todayISO(), nowISO);
+      setSessionId(id);
+      setSessionStartedAt(new Date(nowISO).getTime());
+    }
+    persistSnapshot(id, routine, setsByExercise, effortByExercise);
+    finishSession(id, nowISO);
+    setSessionFinished(true);
+    // Idempotent — a no-op once today's planned_sessions row is already gone (or never existed).
+    deletePlannedSessionForDate(todayISO());
     const unrated = getUnratedVoiceCommandsForDate(todayISO());
     if (unrated.length > 0) {
       setFeedbackLogs(unrated);
     }
+  }
+
+  if (phase === 'loading') {
+    return <View style={styles.container} />;
+  }
+
+  if (phase === 'setup') {
+    return (
+      <>
+        <SessionSetup
+          onBuild={handleBuildFromGroups}
+          onFinalVoiceText={handleVoiceFinalText}
+          onTypeInstead={() => {
+            setPendingVoiceText(undefined);
+            setVoiceModalVisible(true);
+          }}
+        />
+        <VoiceLogModal
+          visible={voiceModalVisible}
+          initialText={pendingVoiceText}
+          onClose={() => {
+            setVoiceModalVisible(false);
+            setPendingVoiceText(undefined);
+          }}
+          onApplyLog={handleApplyVoiceLog}
+          onAdjustRoutine={(excludeGroups, setsOverride, targetMinutes) =>
+            handleAdjustRoutine(excludeGroups, setsOverride, targetMinutes)
+          }
+        />
+      </>
+    );
   }
 
   return (
@@ -337,7 +486,7 @@ export function WorkoutMode() {
         <View>
           <View style={styles.titleRow}>
             <Text style={styles.title}>Today's session</Text>
-            {sessionId != null && (
+            {sessionFinished && (
               <View style={styles.savedPill}>
                 <Ionicons name="checkmark" size={12} color={colors.success} />
                 <Text style={styles.savedPillText}>Saved</Text>
@@ -345,7 +494,7 @@ export function WorkoutMode() {
             )}
           </View>
           <Text style={styles.subtitle}>
-            {routine.length} exercises, full body
+            {routine.length} exercises
             {templateDate ? ` · repeating ${formatShortDate(templateDate)}` : ''}
           </Text>
         </View>
@@ -354,6 +503,20 @@ export function WorkoutMode() {
           <Text style={styles.regenButtonText}>Regenerate</Text>
         </Pressable>
       </View>
+
+      {sessionStartedAt == null ? (
+        <Pressable style={styles.startButton} onPress={handleStartSession}>
+          <Ionicons name="play" size={18} color={colors.bg} />
+          <Text style={styles.startButtonText}>Start session</Text>
+        </Pressable>
+      ) : (
+        <View style={styles.timerPill}>
+          <Ionicons name="time-outline" size={14} color={colors.primary} />
+          <Text style={styles.timerText}>
+            {formatElapsed(now - sessionStartedAt)} {sessionFinished ? '· finished' : 'elapsed'}
+          </Text>
+        </View>
+      )}
 
       <VoiceCommandBar
         onFinalText={handleVoiceFinalText}
@@ -392,7 +555,7 @@ export function WorkoutMode() {
       </Pressable>
 
       <Pressable style={styles.primaryButton} onPress={handleSave}>
-        <Text style={styles.primaryButtonText}>{sessionId != null ? 'Save changes' : 'Finish workout'}</Text>
+        <Text style={styles.primaryButtonText}>{sessionFinished ? 'Save changes' : 'Finish workout'}</Text>
       </Pressable>
 
       <ExercisePickerModal
@@ -482,6 +645,38 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 12,
     fontWeight: '600',
+  },
+  startButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  startButtonText: {
+    color: colors.bg,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  timerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primaryMuted,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  timerText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   addExerciseButton: {
     flexDirection: 'row',

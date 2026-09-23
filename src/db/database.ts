@@ -17,6 +17,7 @@ export function initDatabase() {
     CREATE TABLE IF NOT EXISTS sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT NOT NULL,
+      started_at TEXT,
       finished_at TEXT
     );
 
@@ -79,6 +80,13 @@ export function initDatabase() {
   // Migration for databases created before the `effort` column existed.
   try {
     database.execSync('ALTER TABLE session_exercises ADD COLUMN effort TEXT');
+  } catch {
+    // Column already exists.
+  }
+
+  // Migration for databases created before the `started_at` column existed.
+  try {
+    database.execSync('ALTER TABLE sessions ADD COLUMN started_at TEXT');
   } catch {
     // Column already exists.
   }

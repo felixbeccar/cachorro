@@ -13,9 +13,25 @@ import {
   WeeklySchedule,
 } from '../types';
 
-export function createSession(dateISO: string): number {
-  const result = getDb().runSync('INSERT INTO sessions (date) VALUES (?)', [dateISO]);
+export function createSession(dateISO: string, startedAtISO: string | null = null): number {
+  const result = getDb().runSync('INSERT INTO sessions (date, started_at) VALUES (?, ?)', [dateISO, startedAtISO]);
   return result.lastInsertRowId;
+}
+
+export function startSession(sessionId: number, startedAtISO: string) {
+  getDb().runSync('UPDATE sessions SET started_at = ? WHERE id = ?', [startedAtISO, sessionId]);
+}
+
+/** Any session (finished or still in progress) for a given date — used to resume where you left off. */
+export function getSessionForDate(
+  dateISO: string
+): { id: number; startedAt: string | null; finishedAt: string | null } | null {
+  const row = getDb().getFirstSync<{ id: number; started_at: string | null; finished_at: string | null }>(
+    'SELECT id, started_at, finished_at FROM sessions WHERE date = ? ORDER BY id DESC LIMIT 1',
+    [dateISO]
+  );
+  if (!row) return null;
+  return { id: row.id, startedAt: row.started_at, finishedAt: row.finished_at };
 }
 
 export function finishSession(sessionId: number, finishedAtISO: string) {
