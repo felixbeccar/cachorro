@@ -238,7 +238,7 @@ export function WorkoutMode() {
     setPhase('built');
   }
 
-  function handleBuildFromGroups(selectedGroups: MuscleGroup[]) {
+  function handleBuildFromGroups(selectedGroups: MuscleGroup[], targetMinutes: number) {
     const selected = new Set(selectedGroups);
     // Legs and glutes are trained together — selecting Legs keeps glutes in too (same pairing
     // rule the voice command uses). Nothing checked at all means full body, exclude nothing.
@@ -247,7 +247,7 @@ export function WorkoutMode() {
     const freshStats = getExerciseStats();
     setStats(freshStats);
     const avoidIds = getLastSessionExerciseIds();
-    const { picks, templateDate } = pickRoutine(freshStats, avoidIds, excludeGroups);
+    const { picks, templateDate } = pickRoutine(freshStats, avoidIds, excludeGroups, targetMinutes);
     applyBuiltRoutine(picks, templateDate);
   }
 

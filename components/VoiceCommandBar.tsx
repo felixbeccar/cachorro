@@ -9,6 +9,8 @@ interface Props {
   onFinalText: (text: string) => void;
   onTypeInstead: () => void;
   idleHint?: string;
+  /** 'circle' is a big standalone mic button for an empty-state screen; 'bar' (default) is the compact inline version. */
+  variant?: 'bar' | 'circle';
 }
 
 /**
@@ -20,6 +22,7 @@ export function VoiceCommandBar({
   onFinalText,
   onTypeInstead,
   idleHint = '"No legs today" · "3 sets of 12 at 15kg" · tap to talk',
+  variant = 'bar',
 }: Props) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -78,11 +81,32 @@ export function VoiceCommandBar({
   }
 
   if (deniedPermission) {
-    return (
+    return variant === 'circle' ? (
+      <Pressable style={styles.circleFallback} onPress={onTypeInstead}>
+        <Ionicons name="mic-off-outline" size={20} color={colors.textMuted} />
+        <Text style={styles.fallbackText}>Mic access denied — tap to type a command instead</Text>
+      </Pressable>
+    ) : (
       <Pressable style={styles.fallback} onPress={onTypeInstead}>
         <Ionicons name="mic-off-outline" size={16} color={colors.textMuted} />
         <Text style={styles.fallbackText}>Mic access denied — tap to type a command instead</Text>
       </Pressable>
+    );
+  }
+
+  if (variant === 'circle') {
+    return (
+      <View style={styles.circleWrap}>
+        <Pressable
+          style={[styles.circleButton, listening && styles.circleButtonActive]}
+          onPress={handlePress}
+        >
+          <Ionicons name={listening ? 'radio-button-on' : 'mic'} size={30} color={listening ? colors.bg : colors.primary} />
+        </Pressable>
+        <Text style={styles.circleCaption} numberOfLines={2}>
+          {listening ? transcript || 'Listening… tap to stop' : idleHint}
+        </Text>
+      </View>
     );
   }
 
@@ -156,5 +180,40 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.textMuted,
     fontSize: 12,
+  },
+  circleWrap: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  circleButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.card,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  circleCaption: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  circleFallback: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
   },
 });

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { DurationSlider } from './DurationSlider';
 import { VoiceCommandBar } from './VoiceCommandBar';
 import { colors, radius, spacing } from '../src/theme';
 import { MUSCLE_GROUP_LABEL, MuscleGroup } from '../src/types';
@@ -10,8 +11,10 @@ import { MUSCLE_GROUP_LABEL, MuscleGroup } from '../src/types';
 // matching the same pairing rule the voice command already applies).
 const SETUP_GROUPS: MuscleGroup[] = ['legs', 'core', 'chest', 'back', 'arms', 'shoulders'];
 
+const DEFAULT_MINUTES = 45;
+
 interface Props {
-  onBuild: (selectedGroups: MuscleGroup[]) => void;
+  onBuild: (selectedGroups: MuscleGroup[], targetMinutes: number) => void;
   onFinalVoiceText: (text: string) => void;
   onTypeInstead: () => void;
 }
@@ -25,6 +28,7 @@ function greeting(): string {
 
 export function SessionSetup({ onBuild, onFinalVoiceText, onTypeInstead }: Props) {
   const [selected, setSelected] = useState<Set<MuscleGroup>>(new Set());
+  const [targetMinutes, setTargetMinutes] = useState(DEFAULT_MINUTES);
 
   function toggle(group: MuscleGroup) {
     setSelected((prev) => {
@@ -37,6 +41,7 @@ export function SessionSetup({ onBuild, onFinalVoiceText, onTypeInstead }: Props
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Image source={require('../assets/images/icon.png')} style={styles.logo} />
       <Text style={styles.greeting}>{greeting()}, Felix</Text>
       <Text style={styles.question}>What do you want to train today?</Text>
 
@@ -62,7 +67,9 @@ export function SessionSetup({ onBuild, onFinalVoiceText, onTypeInstead }: Props
           : ' '}
       </Text>
 
-      <Pressable style={styles.buildButton} onPress={() => onBuild(Array.from(selected))}>
+      <DurationSlider value={targetMinutes} onChange={setTargetMinutes} min={15} max={90} step={15} />
+
+      <Pressable style={styles.buildButton} onPress={() => onBuild(Array.from(selected), targetMinutes)}>
         <Text style={styles.buildButtonText}>Build session</Text>
       </Pressable>
 
@@ -73,9 +80,10 @@ export function SessionSetup({ onBuild, onFinalVoiceText, onTypeInstead }: Props
       </View>
 
       <VoiceCommandBar
+        variant="circle"
         onFinalText={onFinalVoiceText}
         onTypeInstead={onTypeInstead}
-        idleHint={'"Legs and core, 45 minutes" · tap to talk and I\'ll build it'}
+        idleHint={'Tap and tell me what you want to build — "legs and core, 45 minutes"'}
       />
     </ScrollView>
   );
@@ -91,6 +99,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.lg,
     paddingBottom: spacing.xl * 2,
+  },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
   },
   greeting: {
     color: colors.text,
