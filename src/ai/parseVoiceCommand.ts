@@ -136,6 +136,12 @@ ${catalog}
      targetMinutes to that many minutes — this matters most when they've also narrowed to one or two
      groups, since without it the routine would only pick one exercise per group and fall way short of
      the requested time. Leave targetMinutes null if no duration was mentioned.
+   - Only use intent=adjust_routine when you actually know what to change. An empty excludeMuscleGroups
+     list means "exclude nothing" and gets applied immediately — it silently resets any muscle-group
+     filter already in place back to full body. So if the request clearly wants a routine change but
+     you're missing something you need (e.g. "make it longer" without saying how long, or which groups
+     to add it to) — use intent=unclear instead, and ask exactly what you need in summary. Never send
+     adjust_routine with empty/default fields just to ask a question.
 
 Speech-to-text mishears things. If a word doesn't match any muscle group or exercise but sounds close to
 one and the rest of the sentence is clearly a workout instruction (e.g. "legs and cold" when talking about

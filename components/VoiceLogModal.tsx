@@ -124,7 +124,14 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
             sets: p.sets.map((s) => ({ weightKg: s.weightKg, reps: s.reps })),
           }))
         );
-      } else if (result.intent === 'adjust_routine') {
+      } else if (
+        result.intent === 'adjust_routine' &&
+        (result.excludeMuscleGroups.length > 0 || result.setsOverride != null || result.targetMinutes != null)
+      ) {
+        // A response with nothing to apply (no exclusions, no sets/duration change) is really a
+        // clarifying question, not a decision — an empty excludeMuscleGroups list means "exclude
+        // nothing," which would silently reset any muscle-group filter already in place. Guard
+        // against applying that even if the model misclassifies it as adjust_routine.
         onAdjustRoutine(
           result.excludeMuscleGroups as MuscleGroup[],
           result.setsOverride,
