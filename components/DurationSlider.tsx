@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
-import { GestureResponderEvent, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { colors, spacing } from '../src/theme';
 
@@ -26,35 +27,34 @@ export function DurationSlider({ value, onChange, min = 15, max = 90, step = 15 
     if (next !== value) onChange(next);
   }
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt: GestureResponderEvent) => setFromX(evt.nativeEvent.locationX),
-      onPanResponderMove: (evt: GestureResponderEvent) => setFromX(evt.nativeEvent.locationX),
-    })
-  ).current;
+  // Plain PanResponder doesn't reliably receive touches once the app root is wrapped in
+  // GestureHandlerRootView (needed for expo-router's nav gestures) — gesture-handler's own
+  // API is what actually gets the touch stream in that setup. runOnJS(true) keeps the callback
+  // as a normal JS function, no Reanimated worklet compilation involved.
+  const pan = Gesture.Pan()
+    .runOnJS(true)
+    .minDistance(0)
+    .onBegin((e) => setFromX(e.x))
+    .onUpdate((e) => setFromX(e.x));
 
   const fraction = max > min ? (value - min) / (max - min) : 0;
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{value} minutes</Text>
-      <View
-        style={styles.touchArea}
-        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-        {...panResponder.panHandlers}
-      >
-        <View style={styles.trackBg} />
-        <View style={[styles.trackFill, { width: `${fraction * 100}%` }]} />
-        <View
-          pointerEvents="none"
-          style={[
-            styles.thumb,
-            { left: `${fraction * 100}%`, transform: [{ translateX: -THUMB_SIZE / 2 }] },
-          ]}
-        />
-      </View>
+      <GestureDetector gesture={pan}>
+        <View style={styles.touchArea} onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}>
+          <View style={styles.trackBg} />
+          <View style={[styles.trackFill, { width: `${fraction * 100}%` }]} />
+          <View
+            pointerEvents="none"
+            style={[
+              styles.thumb,
+              { left: `${fraction * 100}%`, transform: [{ translateX: -THUMB_SIZE / 2 }] },
+            ]}
+          />
+        </View>
+      </GestureDetector>
       <View style={styles.ticksRow}>
         <Text style={styles.tickText}>{min}'</Text>
         <Text style={styles.tickText}>{max}'</Text>
