@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -24,6 +24,44 @@ function summarizePreviousSets(sets: { weightKg: number | null; reps: number | n
     return `${logged.length}×${first.weightKg ?? '-'}kg×${first.reps ?? '-'}`;
   }
   return logged.map((s) => `${s.weightKg ?? '-'}kg×${s.reps ?? '-'}`).join(', ');
+}
+
+interface NumericFieldProps {
+  value: number | null;
+  onChangeValue: (text: string) => void;
+  keyboardType: 'decimal-pad' | 'number-pad';
+  style: object;
+}
+
+/**
+ * A plain controlled TextInput that echoes `String(value)` fights decimal entry: typing "82."
+ * parses to the number 82, which redisplays as "82" and strips the "." before you can type the
+ * digit after it. This keeps what you've actually typed as local state while focused, and only
+ * reconciles with the canonical numeric value (e.g. an external change, or on blur) when idle.
+ */
+function NumericField({ value, onChangeValue, keyboardType, style }: NumericFieldProps) {
+  const [text, setText] = useState(value != null ? String(value) : '');
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setText(value != null ? String(value) : '');
+  }, [value, focused]);
+
+  return (
+    <TextInput
+      style={style}
+      keyboardType={keyboardType}
+      placeholder="-"
+      placeholderTextColor={colors.textMuted}
+      value={text}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onChangeText={(v) => {
+        setText(v);
+        onChangeValue(v);
+      }}
+    />
+  );
 }
 
 interface Props {
@@ -144,21 +182,17 @@ export function ExerciseCard({
           {sets.map((set, i) => (
             <View style={styles.setRow} key={i}>
               <Text style={[styles.setIndex, { flex: 0.6 }]}>{i + 1}</Text>
-              <TextInput
+              <NumericField
                 style={styles.input}
-                keyboardType="numeric"
-                placeholder="-"
-                placeholderTextColor={colors.textMuted}
-                value={set.weightKg != null ? String(set.weightKg) : ''}
-                onChangeText={(v) => onChangeSet(i, 'weightKg', v)}
+                keyboardType="decimal-pad"
+                value={set.weightKg}
+                onChangeValue={(v) => onChangeSet(i, 'weightKg', v)}
               />
-              <TextInput
+              <NumericField
                 style={styles.input}
-                keyboardType="numeric"
-                placeholder="-"
-                placeholderTextColor={colors.textMuted}
-                value={set.reps != null ? String(set.reps) : ''}
-                onChangeText={(v) => onChangeSet(i, 'reps', v)}
+                keyboardType="number-pad"
+                value={set.reps}
+                onChangeValue={(v) => onChangeSet(i, 'reps', v)}
               />
             </View>
           ))}

@@ -56,6 +56,45 @@ function parseNumber(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+interface NumericFieldProps {
+  value: number | null;
+  onChangeValue: (text: string) => void;
+  keyboardType: 'decimal-pad' | 'number-pad';
+  style: object;
+  placeholder: string;
+}
+
+/**
+ * A plain controlled TextInput that echoes `String(value)` fights decimal entry: typing "82."
+ * parses to the number 82, which redisplays as "82" and strips the "." before you can type the
+ * digit after it. This keeps what you've actually typed as local state while focused, and only
+ * reconciles with the canonical numeric value (e.g. an external change, or on blur) when idle.
+ */
+function NumericField({ value, onChangeValue, keyboardType, style, placeholder }: NumericFieldProps) {
+  const [text, setText] = useState(value != null ? String(value) : '');
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setText(value != null ? String(value) : '');
+  }, [value, focused]);
+
+  return (
+    <TextInput
+      style={style}
+      keyboardType={keyboardType}
+      placeholder={placeholder}
+      placeholderTextColor={colors.textMuted}
+      value={text}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onChangeText={(v) => {
+        setText(v);
+        onChangeValue(v);
+      }}
+    />
+  );
+}
+
 export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdjustRoutine }: Props) {
   const [apiKey, setApiKeyState] = useState<string | null>(null);
   const [checkingKey, setCheckingKey] = useState(true);
@@ -251,21 +290,19 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
                 {entry.sets.map((set, setIndex) => (
                   <View key={setIndex} style={styles.setRow}>
                     <Text style={styles.setIndex}>{setIndex + 1}</Text>
-                    <TextInput
+                    <NumericField
                       style={styles.setInput}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                       placeholder="kg"
-                      placeholderTextColor={colors.textMuted}
-                      value={set.weightKg != null ? String(set.weightKg) : ''}
-                      onChangeText={(v) => handleChangeSet(entryIndex, setIndex, 'weightKg', v)}
+                      value={set.weightKg}
+                      onChangeValue={(v) => handleChangeSet(entryIndex, setIndex, 'weightKg', v)}
                     />
-                    <TextInput
+                    <NumericField
                       style={styles.setInput}
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="reps"
-                      placeholderTextColor={colors.textMuted}
-                      value={set.reps != null ? String(set.reps) : ''}
-                      onChangeText={(v) => handleChangeSet(entryIndex, setIndex, 'reps', v)}
+                      value={set.reps}
+                      onChangeValue={(v) => handleChangeSet(entryIndex, setIndex, 'reps', v)}
                     />
                   </View>
                 ))}
