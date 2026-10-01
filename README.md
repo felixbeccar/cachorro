@@ -53,7 +53,7 @@ Most changes to this app are JS/TS only (new exercises, screen tweaks, bug fixes
 npm run ship
 ```
 
-That's a shortcut for `eas update --branch preview --platform ios --auto` (defined in `package.json`) — `--auto` fills the update message from your latest git commit and skips the interactive prompts, so it publishes in one shot. Always use `eas`/`eas-cli` directly (as installed via `npm install -g eas-cli` above), not `npx eas` — `npx` doesn't reliably resolve to the globally installed CLI and can fail silently with "could not determine executable to run", which looks like nothing happened even though the command never ran.
+That's a shortcut for `npx eas-cli update --branch preview --platform ios --auto` (defined in `package.json`) — `--auto` fills the update message from your latest git commit and skips the interactive prompts, so it publishes in one shot. Use `npx eas-cli`, not a bare `eas` — even after `npm install -g eas-cli`, the `eas` shorthand isn't guaranteed to be on your shell's `PATH`, and it fails with "eas: command not found" when it isn't. `npx eas` (missing `-cli`) is a different failure: npm looks for a package literally named `eas`, which doesn't exist, and fails with "could not determine executable to run". `npx eas-cli` sidesteps both — it finds the installed CLI directly, PATH or not.
 
 The app checks for an update on launch and applies it automatically (or on the next launch after that) — usually live within a minute or two, no App Store-style download/install step.
 
