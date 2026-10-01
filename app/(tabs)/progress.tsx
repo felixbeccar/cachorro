@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
+import { GymIntelligenceCard } from '../../components/GymIntelligenceCard';
 import { MuscleBalanceChart } from '../../components/MuscleBalanceChart';
 import { ProgressChart } from '../../components/ProgressChart';
 import { getExerciseById } from '../../src/data/exercises';
@@ -121,6 +122,8 @@ export default function ProgressScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Progress</Text>
+
+      <GymIntelligenceCard />
 
       <View style={styles.kpiRow}>
         <View style={styles.kpiTile}>

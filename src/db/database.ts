@@ -70,6 +70,11 @@ export function initDatabase() {
       feedback_note TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS app_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_session_exercises_session ON session_exercises(session_id);
     CREATE INDEX IF NOT EXISTS idx_session_exercises_exercise ON session_exercises(exercise_id);
     CREATE INDEX IF NOT EXISTS idx_sets_session_exercise ON sets(session_exercise_id);

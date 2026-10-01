@@ -144,6 +144,13 @@ export function listSessions(): SessionRow[] {
   );
 }
 
+export function listSessionsSince(sinceISO: string): SessionRow[] {
+  return getDb().getAllSync<SessionRow>(
+    'SELECT id, date, finished_at FROM sessions WHERE finished_at IS NOT NULL AND date >= ? ORDER BY date DESC',
+    [sinceISO]
+  );
+}
+
 export interface SessionExerciseDetail {
   sessionExerciseId: number;
   exerciseId: string;
@@ -437,6 +444,23 @@ export function getStretchLog(dateISO: string): boolean {
     [dateISO]
   );
   return !!row?.completed;
+}
+
+/**
+ * Small general-purpose key-value store for non-secret app state (e.g. a cached AI result) — SQLite
+ * rather than SecureStore, which caps values at 2KB and isn't meant for data this size.
+ */
+export function getAppState(key: string): string | null {
+  const row = getDb().getFirstSync<{ value: string }>('SELECT value FROM app_state WHERE key = ?', [key]);
+  return row?.value ?? null;
+}
+
+export function setAppState(key: string, value: string) {
+  getDb().runSync(
+    `INSERT INTO app_state (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [key, value]
+  );
 }
 
 export function getStretchStreak(): number {
