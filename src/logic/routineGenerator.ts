@@ -17,6 +17,28 @@ function noveltyScore(exerciseId: string, stats: Record<string, ExerciseStat>): 
   return daysSince(stat.lastDoneAt) - stat.timesDone * 2;
 }
 
+/** How many osteopath-prescribed mobility/activation exercises open every session. */
+export const REHAB_START_COUNT = 2;
+
+/**
+ * Picks the osteopath's rehab/mobility exercises (`rehabStart: true`) that should always open a
+ * session, rotating through the bank by novelty so it's not the same 1-2 every time. Independent
+ * of which muscle groups the rest of the session covers — used by both a freshly generated
+ * routine and a replayed past session.
+ */
+export function pickRehabStart(
+  stats: Record<string, ExerciseStat>,
+  count: number = REHAB_START_COUNT
+): RoutinePick[] {
+  const candidates = EXERCISES.filter((e) => e.rehabStart);
+  const ranked = [...candidates].sort((a, b) => noveltyScore(b.id, stats) - noveltyScore(a.id, stats));
+  return ranked.slice(0, count).map((exercise) => ({
+    exercise,
+    isNew: !stats[exercise.id] || stats[exercise.id].timesDone === 0,
+    group: exercise.muscleGroups[0],
+  }));
+}
+
 /**
  * Builds a well-rounded ~40-45 minute routine: one exercise per major muscle group,
  * preferring exercises the user hasn't done, or hasn't done in a while.
@@ -72,12 +94,16 @@ export function generateRoutine(
     return true;
   }
 
+  const rehabPicks = pickRehabStart(stats);
+
   for (const group of activeGroups) {
     pickBestFor(group);
   }
 
   if (targetMinutes != null) {
-    let minutes = WARMUP_MINUTES + picks.reduce((sum, p) => sum + estimateExerciseMinutes(p.exercise, setsOverride), 0);
+    const rehabMinutes = rehabPicks.reduce((sum, p) => sum + estimateExerciseMinutes(p.exercise, setsOverride), 0);
+    let minutes =
+      WARMUP_MINUTES + rehabMinutes + picks.reduce((sum, p) => sum + estimateExerciseMinutes(p.exercise, setsOverride), 0);
     let addedThisPass = true;
     while (minutes < targetMinutes && addedThisPass) {
       addedThisPass = false;
@@ -92,5 +118,5 @@ export function generateRoutine(
     }
   }
 
-  return picks;
+  return [...rehabPicks, ...picks];
 }

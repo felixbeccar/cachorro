@@ -1,5 +1,6 @@
 import { getExerciseById } from '../data/exercises';
 import { getSessionDetail, listSessions } from '../db/queries';
+import { pickRehabStart } from './routineGenerator';
 import { estimateExerciseMinutes, WARMUP_MINUTES } from './timeline';
 import { Exercise, ExerciseStat, MuscleGroup, RoutinePick } from '../types';
 
@@ -88,12 +89,17 @@ export function maybePickTemplate(
 }
 
 export function templateToPicks(template: SessionTemplate, stats: Record<string, ExerciseStat>): RoutinePick[] {
-  return template.exerciseIds
+  // Strip any rehab-start exercises the stored session happened to include (it may already have
+  // had its own, from whenever it was logged) so a fresh, rotated pair goes on top instead of a
+  // stale duplicate pair underneath them.
+  const regularPicks = template.exerciseIds
     .map((id) => getExerciseById(id))
     .filter((e): e is Exercise => !!e)
+    .filter((e) => !e.rehabStart)
     .map((exercise) => ({
       exercise,
       isNew: !stats[exercise.id] || stats[exercise.id].timesDone === 0,
       group: exercise.muscleGroups[0],
     }));
+  return [...pickRehabStart(stats), ...regularPicks];
 }

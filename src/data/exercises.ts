@@ -47,6 +47,7 @@ export const EXERCISES: Exercise[] = [
   { id: 'russian-twist', name: 'Russian Twist', muscleGroups: ['core'], equipment: 'Dumbbell / Plate', defaultSets: 3, defaultReps: '15-20' },
   { id: 'seated-windshield-wipers', name: 'Seated Windshield Wipers', muscleGroups: ['core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '10-15 / side' },
   { id: 'ab-wheel-rollout', name: 'Ab Wheel Rollout', muscleGroups: ['core'], equipment: 'Ab wheel', defaultSets: 3, defaultReps: '8-12' },
+  { id: 'captains-chair-knee-raise', name: "Captain's Chair Knee Raise", muscleGroups: ['core'], equipment: "Captain's chair / power tower", defaultSets: 3, defaultReps: '12-15' },
 
   // Arms
   { id: 'barbell-curl', name: 'Barbell Bicep Curl', muscleGroups: ['arms'], equipment: 'Barbell', defaultSets: 3, defaultReps: '8-12' },
@@ -57,6 +58,30 @@ export const EXERCISES: Exercise[] = [
 
   // Cooldown
   { id: 'stretching', name: 'Stretching', muscleGroups: ['legs', 'back'], equipment: 'Bodyweight', defaultSets: 1, defaultReps: '10-15 min', manualOnly: true },
+
+  // Osteopath mobility/rehab bank — 1-2 of these always open a generated session (see
+  // pickRehabStart in routineGenerator.ts), independent of muscle groups selected that day.
+  // From "Blueprint de Rehabilitación y Movilidad Funcional" (osteopath, 5 Oct 2026).
+  { id: 'osteo-crook-breathing', name: 'Crook Lying Breathing', muscleGroups: ['core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '10', manualOnly: true, rehabStart: true },
+  { id: 'osteo-cat-cow-assisted', name: 'Assisted Cat-Cow', muscleGroups: ['back', 'core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '8-10', manualOnly: true, rehabStart: true },
+  { id: 'osteo-quad-stretch-kneeling', name: 'Kneeling Quad Stretch', muscleGroups: ['legs'], equipment: 'Bodyweight', defaultSets: 2, defaultReps: '8 / leg', manualOnly: true, rehabStart: true },
+  { id: 'osteo-windshield-wipers-seated', name: 'Seated Hip Windshield Wipers', muscleGroups: ['glutes', 'core'], equipment: 'Bodyweight', defaultSets: 2, defaultReps: '10 total', manualOnly: true, rehabStart: true },
+  { id: 'osteo-clamshell', name: 'Gentle Clamshell', muscleGroups: ['glutes'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '10-12 / side', manualOnly: true, rehabStart: true },
+  { id: 'osteo-glute-bridge', name: 'Activation Glute Bridge', muscleGroups: ['glutes', 'core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '10', manualOnly: true, rehabStart: true },
+  { id: 'osteo-supine-hamstring-stretch', name: 'Supine Hamstring Towel Stretch', muscleGroups: ['legs'], equipment: 'Towel', defaultSets: 2, defaultReps: '8 / leg', manualOnly: true, rehabStart: true },
+  { id: 'osteo-hip-90-90-transitions', name: 'Hip 90/90 Transitions', muscleGroups: ['glutes', 'legs'], equipment: 'Bodyweight', defaultSets: 2, defaultReps: '6', manualOnly: true, rehabStart: true },
+  { id: 'osteo-dead-bug', name: 'Modified Dead Bug', muscleGroups: ['core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '8 / leg', manualOnly: true, rehabStart: true },
+  { id: 'osteo-bird-dog-band', name: 'Band Bird-Dog', muscleGroups: ['core', 'back'], equipment: 'Resistance band', defaultSets: 3, defaultReps: '8 / side', manualOnly: true, rehabStart: true },
+  { id: 'osteo-frog-stretch', name: 'Frog Stretch', muscleGroups: ['legs', 'glutes'], equipment: 'Bodyweight', defaultSets: 2, defaultReps: '6-8', manualOnly: true, rehabStart: true },
+  { id: 'osteo-low-lunge-rotation', name: 'Low Lunge with Rotation', muscleGroups: ['legs', 'back'], equipment: 'Bodyweight', defaultSets: 2, defaultReps: '6 / side', manualOnly: true, rehabStart: true },
+  { id: 'osteo-box-squat', name: 'Controlled Box Squat', muscleGroups: ['legs', 'glutes'], equipment: 'Box / chair', defaultSets: 3, defaultReps: '10', manualOnly: true, rehabStart: true },
+  { id: 'osteo-single-leg-glute-bridge', name: 'Single-Leg Activation Bridge', muscleGroups: ['glutes', 'core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '8 / leg', manualOnly: true, rehabStart: true },
+  { id: 'osteo-cossack-stretch', name: 'Progressive Cossack Stretch', muscleGroups: ['legs', 'glutes'], equipment: 'Bodyweight', defaultSets: 2, defaultReps: '6-8 / side', manualOnly: true, rehabStart: true },
+  { id: 'osteo-advanced-clamshell-band', name: 'Advanced Banded Clamshell', muscleGroups: ['glutes'], equipment: 'Mini resistance band', defaultSets: 3, defaultReps: '10-12 / side', manualOnly: true, rehabStart: true },
+  { id: 'osteo-childs-pose-side-reach', name: "Child's Pose with Side Reach", muscleGroups: ['back', 'core'], equipment: 'Bodyweight', defaultSets: 2, defaultReps: '30 sec / side', manualOnly: true, rehabStart: true },
+  { id: 'osteo-figure-4-piriformis-stretch', name: 'Figure-4 Piriformis Stretch', muscleGroups: ['glutes', 'legs'], equipment: 'Bodyweight', defaultSets: 2, defaultReps: '30-45 sec / leg', manualOnly: true, rehabStart: true },
+  { id: 'osteo-worlds-greatest-stretch', name: "World's Greatest Stretch", muscleGroups: ['legs', 'back', 'core'], equipment: 'Bodyweight', defaultSets: 2, defaultReps: '5 / side', manualOnly: true, rehabStart: true },
+  { id: 'osteo-forearm-plank-modified', name: 'Modified Forearm Plank', muscleGroups: ['core'], equipment: 'Bodyweight', defaultSets: 3, defaultReps: '20-30 sec', manualOnly: true, rehabStart: true },
 ];
 
 export function getExerciseById(id: string): Exercise | undefined {

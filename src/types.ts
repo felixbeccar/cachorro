@@ -29,6 +29,10 @@ export interface Exercise {
   defaultReps: string;
   // Excluded from the auto-generated routine (e.g. a cooldown block) — still pickable via "Add exercise".
   manualOnly?: boolean;
+  // Osteopath-prescribed mobility/activation work. Not picked by the normal per-group routine
+  // logic (always paired with manualOnly) — instead 1-2 of these get prepended to every
+  // generated/replayed session, rotating by novelty, regardless of which muscle groups it covers.
+  rehabStart?: boolean;
 }
 
 export interface Stretch {
