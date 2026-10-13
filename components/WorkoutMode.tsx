@@ -124,6 +124,7 @@ export function WorkoutMode() {
   const [pickerTarget, setPickerTarget] = useState<'add' | number | null>(null);
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [pendingVoiceText, setPendingVoiceText] = useState<string | undefined>(undefined);
+  const [manageKeyMode, setManageKeyMode] = useState(false);
   const [feedbackLogs, setFeedbackLogs] = useState<VoiceCommandLogRow[] | null>(null);
   // Set when today's routine is a repeat of a good past session rather than freshly generated.
   const [templateDate, setTemplateDate] = useState<string | null>(null);
@@ -381,6 +382,18 @@ export function WorkoutMode() {
     setVoiceModalVisible(true);
   }
 
+  function handleManageApiKey() {
+    setPendingVoiceText(undefined);
+    setManageKeyMode(true);
+    setVoiceModalVisible(true);
+  }
+
+  function closeVoiceModal() {
+    setVoiceModalVisible(false);
+    setPendingVoiceText(undefined);
+    setManageKeyMode(false);
+  }
+
   function handleMove(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= routine.length) return;
@@ -463,14 +476,13 @@ export function WorkoutMode() {
             setPendingVoiceText(undefined);
             setVoiceModalVisible(true);
           }}
+          onManageApiKey={handleManageApiKey}
         />
         <VoiceLogModal
           visible={voiceModalVisible}
           initialText={pendingVoiceText}
-          onClose={() => {
-            setVoiceModalVisible(false);
-            setPendingVoiceText(undefined);
-          }}
+          manageKeyMode={manageKeyMode}
+          onClose={closeVoiceModal}
           onApplyLog={handleApplyVoiceLog}
           onAdjustRoutine={(excludeGroups, setsOverride, targetMinutes) =>
             handleAdjustRoutine(excludeGroups, setsOverride, targetMinutes)
@@ -525,6 +537,9 @@ export function WorkoutMode() {
           setVoiceModalVisible(true);
         }}
       />
+      <Pressable style={styles.manageKeyLink} onPress={handleManageApiKey}>
+        <Text style={styles.manageKeyLinkText}>Manage API key</Text>
+      </Pressable>
       <SessionReportCard exercises={routine.map((p) => p.exercise)} effort={sessionEffort} />
 
       {routine.map((pick, i) => (
@@ -568,10 +583,8 @@ export function WorkoutMode() {
       <VoiceLogModal
         visible={voiceModalVisible}
         initialText={pendingVoiceText}
-        onClose={() => {
-          setVoiceModalVisible(false);
-          setPendingVoiceText(undefined);
-        }}
+        manageKeyMode={manageKeyMode}
+        onClose={closeVoiceModal}
         onApplyLog={handleApplyVoiceLog}
         onAdjustRoutine={(excludeGroups, setsOverride, targetMinutes) =>
           handleAdjustRoutine(excludeGroups, setsOverride, targetMinutes)
@@ -677,6 +690,15 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  manageKeyLink: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  manageKeyLinkText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    textDecorationLine: 'underline',
   },
   addExerciseButton: {
     flexDirection: 'row',

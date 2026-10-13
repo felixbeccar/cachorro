@@ -17,6 +17,7 @@ interface Props {
   onBuild: (selectedGroups: MuscleGroup[], targetMinutes: number) => void;
   onFinalVoiceText: (text: string) => void;
   onTypeInstead: () => void;
+  onManageApiKey: () => void;
 }
 
 function greeting(): string {
@@ -26,7 +27,7 @@ function greeting(): string {
   return 'Good evening';
 }
 
-export function SessionSetup({ onBuild, onFinalVoiceText, onTypeInstead }: Props) {
+export function SessionSetup({ onBuild, onFinalVoiceText, onTypeInstead, onManageApiKey }: Props) {
   const [selected, setSelected] = useState<Set<MuscleGroup>>(new Set());
   const [targetMinutes, setTargetMinutes] = useState(DEFAULT_MINUTES);
 
@@ -85,6 +86,9 @@ export function SessionSetup({ onBuild, onFinalVoiceText, onTypeInstead }: Props
         onTypeInstead={onTypeInstead}
         idleHint={'Tap and tell me what you want to build — "legs and core, 45 minutes"'}
       />
+      <Pressable style={styles.manageKeyLink} onPress={onManageApiKey}>
+        <Text style={styles.manageKeyLinkText}>Manage API key</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -185,5 +189,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     fontWeight: '600',
+  },
+  manageKeyLink: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  manageKeyLinkText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    textDecorationLine: 'underline',
   },
 });

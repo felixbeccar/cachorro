@@ -93,6 +93,8 @@ How it works: tap the mic — it starts listening immediately, no text box first
 
 If mic/speech permission is denied, the bar falls back to a "tap to type a command instead" link that opens the same flow with a text box.
 
+To rotate or replace the key later (e.g. it's expiring), tap **Manage API key** — a small link under the mic on both the Today setup screen and the built-session screen — which opens straight to the key entry form instead of making you deny mic permission first just to reach it.
+
 ### Improving the voice command over time
 
 Every voice command (transcript, what it was classified as, and the AI's one-line summary of what it did) is logged locally to `voice_command_logs`. If any commands from today weren't rated yet, saving/finishing a session prompts a quick 👍/👎 per command — 👎 opens an optional "what went wrong?" note. This is deliberately not an automated self-tuning loop (too much risk of prompt drift for one person's data with no easy rollback); instead, tap **Share voice command log** on the Progress tab any time to export the full rated log as plain text via the share sheet — send that over and the system prompt in `src/ai/parseVoiceCommand.ts` gets hand-tuned against real patterns.

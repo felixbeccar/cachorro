@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { clearApiKey, getApiKey, setApiKey as saveApiKey } from '../src/ai/apiKeyStore';
+import { getApiKey, setApiKey as saveApiKey } from '../src/ai/apiKeyStore';
 import { parseVoiceCommand } from '../src/ai/parseVoiceCommand';
 import { getExerciseById } from '../src/data/exercises';
 import { logVoiceCommand } from '../src/db/queries';
@@ -40,6 +40,8 @@ interface Props {
   visible: boolean;
   /** Pre-captured transcript (from the native voice bar) — parses immediately, skipping the typing screen. */
   initialText?: string;
+  /** Opens straight to the API key entry screen (e.g. to rotate an existing key), skipping voice/typing. */
+  manageKeyMode?: boolean;
   onClose: () => void;
   onApplyLog: (entries: { exercise: Exercise; sets: ReviewSet[] }[]) => void;
   onAdjustRoutine: (
@@ -95,10 +97,11 @@ function NumericField({ value, onChangeValue, keyboardType, style, placeholder }
   );
 }
 
-export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdjustRoutine }: Props) {
+export function VoiceLogModal({ visible, initialText, manageKeyMode = false, onClose, onApplyLog, onAdjustRoutine }: Props) {
   const [apiKey, setApiKeyState] = useState<string | null>(null);
   const [checkingKey, setCheckingKey] = useState(true);
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const [editingKey, setEditingKey] = useState(false);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -110,11 +113,12 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
   useEffect(() => {
     if (!visible) return;
     setCheckingKey(true);
+    setEditingKey(manageKeyMode);
     getApiKey().then((key) => {
       setApiKeyState(key);
       setCheckingKey(false);
     });
-  }, [visible]);
+  }, [visible, manageKeyMode]);
 
   // Voice bar handed us a final transcript — parse right away, no typing/Parse tap needed.
   useEffect(() => {
@@ -132,6 +136,8 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
     setAdjustSummary(null);
     setErrorMessage('');
     setInitialTextHandled(false);
+    setEditingKey(false);
+    setApiKeyInput('');
     onClose();
   }
 
@@ -140,12 +146,7 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
     await saveApiKey(apiKeyInput);
     setApiKeyState(apiKeyInput.trim());
     setApiKeyInput('');
-  }
-
-  async function handleChangeApiKey() {
-    await clearApiKey();
-    setApiKeyState(null);
-    setErrorMessage('');
+    setEditingKey(false);
   }
 
   async function handleParse(spokenText: string) {
@@ -225,8 +226,9 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
     resetAndClose();
   }
 
-  const readyForInput = !checkingKey && !!apiKey && !reviewEntries && !adjustSummary;
+  const readyForInput = !checkingKey && !!apiKey && !editingKey && !reviewEntries && !adjustSummary;
   const showListeningState = readyForInput && (loading || (!!initialText && !initialTextHandled));
+  const showKeyForm = !checkingKey && (!apiKey || editingKey);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={resetAndClose} presentationStyle="pageSheet">
@@ -245,9 +247,9 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
           <View style={styles.center}>
             <ActivityIndicator color={colors.primary} />
           </View>
-        ) : !apiKey ? (
+        ) : showKeyForm ? (
           <View style={styles.content}>
-            <Text style={styles.label}>Anthropic API key</Text>
+            <Text style={styles.label}>{apiKey ? 'Update your Anthropic API key' : 'Anthropic API key'}</Text>
             <Text style={styles.hint}>
               Get one at console.anthropic.com. Stored only on your phone, in the secure keychain.
             </Text>
@@ -261,9 +263,24 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <Pressable style={styles.primaryButton} onPress={handleSaveApiKey}>
+            <Pressable
+              style={[styles.primaryButton, !apiKeyInput.trim() && styles.primaryButtonDisabled]}
+              onPress={handleSaveApiKey}
+              disabled={!apiKeyInput.trim()}
+            >
               <Text style={styles.primaryButtonText}>Save key</Text>
             </Pressable>
+            {apiKey && (
+              <Pressable
+                style={styles.changeKeyLink}
+                onPress={() => {
+                  setApiKeyInput('');
+                  setEditingKey(false);
+                }}
+              >
+                <Text style={styles.changeKeyLinkText}>Cancel</Text>
+              </Pressable>
+            )}
           </View>
         ) : adjustSummary ? (
           <View style={styles.center}>
@@ -348,7 +365,7 @@ export function VoiceLogModal({ visible, initialText, onClose, onApplyLog, onAdj
                 <Text style={styles.primaryButtonText}>Parse</Text>
               )}
             </Pressable>
-            <Pressable style={styles.changeKeyLink} onPress={handleChangeApiKey}>
+            <Pressable style={styles.changeKeyLink} onPress={() => setEditingKey(true)}>
               <Text style={styles.changeKeyLinkText}>Change API key</Text>
             </Pressable>
           </View>
