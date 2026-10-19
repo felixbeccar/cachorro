@@ -18,6 +18,9 @@ interface Props {
   onFinalVoiceText: (text: string) => void;
   onTypeInstead: () => void;
   onManageApiKey: () => void;
+  /** Exercise count of a routine already queued for today from the Plan tab, if any. */
+  plannedCount?: number;
+  onUsePlanned?: () => void;
 }
 
 function greeting(): string {
@@ -27,7 +30,14 @@ function greeting(): string {
   return 'Good evening';
 }
 
-export function SessionSetup({ onBuild, onFinalVoiceText, onTypeInstead, onManageApiKey }: Props) {
+export function SessionSetup({
+  onBuild,
+  onFinalVoiceText,
+  onTypeInstead,
+  onManageApiKey,
+  plannedCount,
+  onUsePlanned,
+}: Props) {
   const [selected, setSelected] = useState<Set<MuscleGroup>>(new Set());
   const [targetMinutes, setTargetMinutes] = useState(DEFAULT_MINUTES);
 
@@ -45,6 +55,17 @@ export function SessionSetup({ onBuild, onFinalVoiceText, onTypeInstead, onManag
       <Image source={require('../assets/images/icon.png')} style={styles.logo} />
       <Text style={styles.greeting}>{greeting()}, Felix</Text>
       <Text style={styles.question}>What do you want to train today?</Text>
+
+      {plannedCount != null && plannedCount > 0 && onUsePlanned && (
+        <Pressable style={styles.plannedBanner} onPress={onUsePlanned}>
+          <Ionicons name="calendar" size={18} color={colors.primary} />
+          <View style={styles.plannedBannerText}>
+            <Text style={styles.plannedBannerTitle}>Today's planned session is ready</Text>
+            <Text style={styles.plannedBannerSubtitle}>{plannedCount} exercises, set up from the Plan tab</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+        </Pressable>
+      )}
 
       <View style={styles.grid}>
         {SETUP_GROUPS.map((group) => {
@@ -123,6 +144,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xs,
     marginBottom: spacing.xl,
+  },
+  plannedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  plannedBannerText: {
+    flex: 1,
+  },
+  plannedBannerTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  plannedBannerSubtitle: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
   },
   grid: {
     flexDirection: 'row',

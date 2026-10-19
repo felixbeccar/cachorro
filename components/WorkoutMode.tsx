@@ -128,6 +128,9 @@ export function WorkoutMode() {
   const [feedbackLogs, setFeedbackLogs] = useState<VoiceCommandLogRow[] | null>(null);
   // Set when today's routine is a repeat of a good past session rather than freshly generated.
   const [templateDate, setTemplateDate] = useState<string | null>(null);
+  // A Plan-tab routine already queued for today — offered as a shortcut on the setup screen
+  // rather than auto-loading, so the checkbox screen is always reachable (see applyBuiltRoutine).
+  const [plannedPicks, setPlannedPicks] = useState<RoutinePick[] | null>(null);
 
   const loadToday = useCallback(() => {
     const freshStats = getExerciseStats();
@@ -163,36 +166,27 @@ export function WorkoutMode() {
       setSessionId(existing.id);
       setSessionStartedAt(existing.startedAt ? new Date(existing.startedAt).getTime() : null);
       setSessionFinished(!!existing.finishedAt);
+      setPlannedPicks(null);
       setPhase('built');
       return;
     }
 
     const planned = getPlannedSession(todayISO());
-    if (planned && planned.exercises.length > 0) {
-      // Today was set up from the Plan tab — use that instead of generating a fresh one, so
-      // edits made there actually show up here.
-      const picks = planned.exercises
-        .map((pe) => getExerciseById(pe.exerciseId))
-        .filter((e): e is Exercise => !!e)
-        .map((exercise) => ({
-          exercise,
-          isNew: !freshStats[exercise.id] || freshStats[exercise.id].timesDone === 0,
-          group: exercise.muscleGroups[0],
-        }));
-      const sets: Record<string, SetEntry[]> = {};
-      for (const pick of picks) sets[pick.exercise.id] = makeDefaultSets(pick.exercise.defaultSets);
-      setRoutine(picks);
-      setSetsByExercise(sets);
-      setDoneByExercise({});
-      setEffortByExercise({});
-      setSessionId(null);
-      setSessionStartedAt(null);
-      setSessionFinished(false);
-      setPhase('built');
-      return;
-    }
+    const plannedPicksForToday =
+      planned && planned.exercises.length > 0
+        ? planned.exercises
+            .map((pe) => getExerciseById(pe.exerciseId))
+            .filter((e): e is Exercise => !!e)
+            .map((exercise) => ({
+              exercise,
+              isNew: !freshStats[exercise.id] || freshStats[exercise.id].timesDone === 0,
+              group: exercise.muscleGroups[0],
+            }))
+        : null;
+    setPlannedPicks(plannedPicksForToday);
 
-    // Totally fresh day — nothing planned, nothing started. Ask what to train.
+    // Nothing started yet — always ask what to train. If the Plan tab already queued something,
+    // it's offered as a shortcut on the setup screen rather than silently taking over.
     setRoutine([]);
     setSetsByExercise({});
     setDoneByExercise({});
@@ -388,6 +382,11 @@ export function WorkoutMode() {
     setVoiceModalVisible(true);
   }
 
+  function handleUsePlannedSession() {
+    if (!plannedPicks) return;
+    applyBuiltRoutine(plannedPicks, null);
+  }
+
   function closeVoiceModal() {
     setVoiceModalVisible(false);
     setPendingVoiceText(undefined);
@@ -477,6 +476,8 @@ export function WorkoutMode() {
             setVoiceModalVisible(true);
           }}
           onManageApiKey={handleManageApiKey}
+          plannedCount={plannedPicks?.length}
+          onUsePlanned={plannedPicks ? handleUsePlannedSession : undefined}
         />
         <VoiceLogModal
           visible={voiceModalVisible}
